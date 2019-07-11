@@ -117,3 +117,18 @@ def moves_to_action_index(vert_move, horz_move):
     if not (vert_move in [-1, 0, 1] and horz_move in [-1, 0, 1]):
         raise Exception('Invalid move. Vertical and horizontal components must be in [-1. 0. 1]')
     return int((vert_move + 1 ) * 3 + (horz_move + 1))
+
+
+def stabilisation_analysis(stats, averaging_window = 1000, mean_tolerance = 5, var_tolerance = 25):
+    i = 0
+    while i + 2 * averaging_window - 1 <= len(stats[0]):
+        average_window_1 = np.mean(stats.episode_lengths[i:i + averaging_window - 1])
+        # average_window_2 = np.mean(stats.episode_lengths[i + averaging_window:i + 2 * averaging_window - 1])
+        average_window_2 = np.mean(stats.episode_lengths[i + averaging_window:])
+        variance_whole_window = np.var(stats.episode_lengths[i:i + 2 * averaging_window - 1])
+        if ((abs(average_window_1 - average_window_2) < mean_tolerance) \
+        and variance_whole_window < var_tolerance):
+            return i, round(np.mean(stats.episode_lengths[i:]),2)
+        else:
+            i += averaging_window
+    raise Exception('Insufficient episodes for episode lengths to stabilise')
