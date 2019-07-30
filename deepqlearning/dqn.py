@@ -1,5 +1,3 @@
-# import gym
-# import random
 import torch
 import numpy as np
 from collections import deque
@@ -13,7 +11,6 @@ from collections import namedtuple
 # import torch
 # reload(torch)
 # import torch
-
 
 def dqn(env, no_episodes=10000, max_t=1000, eps_start=1.0, eps_end=0.01, eps_decay=0.9995):
     """Deep Q-Learning.
