@@ -7,6 +7,7 @@ from lib.generate_graphics import *
 
 from importlib import reload
 
+# test comment
 
 # vvvvvvvvv parameters vvvvvvvvv
 board_height = 4
