@@ -96,7 +96,7 @@ def q_learning(env, no_episodes, discount_factor=0.9, alpha=0.5, epsilon=0.1):
         # Print out the number of completed episodes in increments of print_interval
         print_interval = 50000
         if (episode) % print_interval == 0:
-            print("Episode %i/%i" % (episode, no_episodes+1))
+            print("Episode %i/%i" % (episode, no_episodes))
             sys.stdout.flush()
 
         # Reset the environment and pick the first action

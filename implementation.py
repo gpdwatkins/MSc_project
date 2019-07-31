@@ -1,3 +1,5 @@
+import sys
+sys.path.append('C:\\Users\\George\\Anaconda3\\envs\\gym\\Lib\\site-packages')
 from deepqlearning.dqn import dqn
 from qlearning.q_learning import *
 from lib.utils import *
@@ -23,14 +25,15 @@ policy = get_greedy_policy(Q_values)
 
 # vvvvvvvvv q_learning training vvvvvvvvv
 weights_file, stats_dqn = dqn(env)
+policy = weights_file
 # policy = '20190729_1926_4_6_prox_10000_1000_1.0_0.01_0.9995.pth'
 
 
 # vvvvvvvvv implementation vvvvvvvvv
-show_policy((2,0), board_height, board_width, policy = weights_file)
+show_policy((2,0), board_height, board_width, policy = policy)
 
 
-play_cat_and_mouse(board_height, board_width, show_figs = True, policy = weights_file, sight = 2, mouse_pos_dist = True)
+play_cat_and_mouse(board_height, board_width, show_figs = True, policy = policy, sight = 2, mouse_pos_dist = True)
 
 
 # vvvvvvvvv analysis vvvvvvvvv

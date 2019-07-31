@@ -106,13 +106,6 @@ import torch
 
 
 
-
-
-
-
-
-
-
 def play_cat_and_mouse(board_height, board_width, show_figs = True, policy = None, sight = float('inf'), mouse_pos_dist = False):
     # assumimg cat has sight 2 in each direction (i.e. can see a 5x5 grid around iteself)
     # cat and mouse move uniformly (can move any direction, or stay put, with prob 1/9)

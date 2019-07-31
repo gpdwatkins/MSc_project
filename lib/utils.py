@@ -32,9 +32,33 @@ def initialise_mouse_prob_dist(height, width, cat_pos, mouse_pos, sight):
         mouse_pos_prob_dist *= 1/(height * width - no_observable_cells)
     return mouse_pos_prob_dist
 
+
 def cat_can_see_mouse(cat_pos, mouse_pos, sight):
     # assumimg cat has can see sight squares in each direction (i.e. can see a (1+2xsight)x(1+2xsight) grid around itself)
     return ((abs(cat_pos[0]-mouse_pos[0]) <= sight) and (abs(cat_pos[1]-mouse_pos[1]) <= sight))
+
+
+def board_pos_index_to_board_pos(board_pos_index, board_height, board_width):
+    if not board_pos_index in range(board_height * board_width):
+        raise ValueError('board_pos_index must be between 0 and %d' % (board_height * board_width - 1))
+
+    board_row = float(np.mod(board_pos_index,board_height))
+    board_col = np.mod(board_pos_index - board_row, board_height * board_width) / board_height
+    return (int(board_row), int(board_col))
+
+
+def board_pos_to_board_pos_index(board_pos):
+    if not np.prod([ \
+    board_pos[0] in range(board_height), \
+    board_pos[1] in range(board_width), \
+    ]):
+        raise ValueError('Board position (%d,%d) is outside the board' % (board_pos[0], board_pos[1]))
+
+    board_pos_index = int( \
+    board_pos[0] + \
+    board_pos[1] * board_height \
+    )
+    return board_pos_index
 
 
 def state_index_to_positions(state_index, board_height, board_width):
@@ -91,12 +115,10 @@ def positions_to_nn_input(cat_pos, mouse_pos, board_height, board_width):
     output_vector = np.zeros(2 + board_height * board_width)
     output_vector[0] = cat_pos[0]/(board_height-1)
     output_vector[1] = cat_pos[1]/(board_width-1)
-    mouse_pos_index = int( \
-    mouse_pos[0] + \
-    mouse_pos[1] * board_height \
-    )
+    mouse_pos_index = board_pos_to_board_pos_index(mouse_pos)
     output_vector[mouse_pos_index + 2] = 1
     return output_vector
+
 
 def nn_input_to_positions(nn_input, board_height, board_width):
     if not len(nn_input) == 2 + board_height * board_width:
@@ -104,19 +126,8 @@ def nn_input_to_positions(nn_input, board_height, board_width):
     cat_vert_pos = nn_input[0] * (board_height-1)
     cat_horz_pos = nn_input[1] * (board_width-1)
     mouse_pos_index = list(nn_input[2:]).index(1)
-    mouse_vert_pos = float(np.mod(mouse_pos_index,board_height))
-    mouse_horz_pos = np.mod(mouse_pos_index - mouse_vert_pos, board_height * board_width) / board_height
+    mouse_vert_pos, mouse_horz_pos = board_pos_index_to_board_pos(mouse_pos_index, board_height, board_width)
     return (int(cat_vert_pos), int(cat_horz_pos)), (int(mouse_vert_pos), int(mouse_horz_pos))
-
-
-# board_height = 4
-# board_width = 6
-# cat_pos = [10,1]
-# mouse_pos = [3,5]
-#
-# nn_input = positions_to_nn_input(cat_pos, mouse_pos,board_height,board_width)
-# type(nn_input)
-# nn_input_to_positions(nn_input, board_height, board_width)
 
 
 def action_to_action_index(action):

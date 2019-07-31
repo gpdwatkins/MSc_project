@@ -30,9 +30,9 @@ class CatMouseEnv_box(Env):
 
 
     """
-    def __init__(self, nS, nA, P, isd):
-        # could maybe make P a function that takes the state and returns a dict
-        # with keys as possible next states and values as probabilities?
+    def __init__(self, board_height, board_width, nA, P, isd):
+        # could maybe make P a function that takes the state and action and returns
+        # a dict with keys as possible next states and values as probabilities?
         self.P = P
         self.isd = isd
         self.lastaction = None # for rendering
@@ -40,7 +40,7 @@ class CatMouseEnv_box(Env):
         self.nA = nA
 
         self.action_space = spaces.Discrete(self.nA)
-        self.observation_space = spaces.Discrete(self.nS)
+        self.observation_space = spaces.Box(low=0, high=1.0, shape=(2 * board_height * board_width), dtype=np.float32)
 
         self.seed()
         self.s = categorical_sample(self.isd, self.np_random)
