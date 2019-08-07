@@ -25,14 +25,11 @@ def imscatter(x, y, image, ax=None, zoom=1):
         pass
     im = OffsetImage(image, zoom=zoom)
     x, y = np.atleast_1d(x, y)
-    # artists = []
     for x0, y0 in zip(x, y):
         ab = AnnotationBbox(im, (x0, y0), frameon=False)
-        # artists.append(ax.add_artist(ab))
         ax.add_artist(ab)
     ax.update_datalim(np.column_stack([x, y]))
     ax.autoscale()
-    # return artists
 
 
 def generate_fig(cat_pos, mouse_pos, mouse_pos_prob_dist, board_height, board_width, filename, show_fig = True):
@@ -68,69 +65,6 @@ def generate_gif(image_filenames, gif_filename):
         for filename in image_filenames:
             image = imread(join('graphics_gif/', filename))
             writer.append_data(image)
-
-#
-# def show_policy(mouse_pos, board_height, board_width, policy = None):
-#     # given a policy and a mouse_pos, shows what action the cat would take
-#     # if it were located in each of the other squares on the board
-#     # if no policy is specified, a random policy is shown
-#     # policy could alternatively be a dict mapping state_index to action
-#     # or a string specifying a file path to some trained weights
-#     action_to_arrow_files = { \
-#     0:'icon_NW.gif', \
-#     1:'icon_N.gif', \
-#     2:'icon_NE.gif', \
-#     3:'icon_W.gif', \
-#     4:'icon_X.gif', \
-#     5:'icon_E.gif', \
-#     6:'icon_SW.gif', \
-#     7:'icon_S.gif', \
-#     8:'icon_SE.gif', \
-#     }
-#
-#     fig_width = 20
-#     fig = plt.figure(figsize=(fig_width, fig_width * board_height/board_width))
-#     ax1 = fig.add_subplot(111)
-#
-#     mouse_pos_prob_dist = np.zeros([board_height, board_width])
-#
-#     sns.heatmap(mouse_pos_prob_dist, cmap="Blues", vmin=0, vmax=1, linewidths=.5, ax = ax1, cbar = None)
-#     ax1.figure.axes[-1].yaxis.label.set_size(12)
-#
-#     imscatter(mouse_pos[1] + 1/2, mouse_pos[0] + 1/2, plt.imread('jerry.gif'), zoom = 0.1 * fig_width/10 * 6/board_width, ax=ax1)
-#
-#     cat_pos_actions = {}
-#     if policy == None:
-#         print("No policy provided; using random policy")
-#         for cat_vert_pos in range(board_height):
-#             for cat_horz_pos in range(board_width):
-#                 cat_pos_actions[(cat_vert_pos, cat_horz_pos)] = np.random.choice(list(action_to_arrow_files.keys()))
-#     elif type(policy) is dict:
-#         for (state_index, action) in policy.items():
-#             state_cat_pos, state_mouse_pos = state_index_to_positions(state_index, board_height, board_width)
-#             if mouse_pos == state_mouse_pos:
-#                 cat_pos_actions[state_cat_pos] = action
-#     elif type(policy) is str and policy[-4:] == '.pth':
-#         agent = Agent(state_size = 2 + board_height * board_width, action_size = len(list(action_to_arrow_files.keys())), seed = 0)
-#         agent.qnetwork_behaviour.load_state_dict(torch.load('checkpoint.pth'))
-#         for cat_vert_pos in range(board_height):
-#             for cat_horz_pos in range(board_width):
-#                 nn_state = positions_to_nn_input((cat_vert_pos, cat_horz_pos), mouse_pos, board_height, board_width)
-#                 cat_pos_actions[(cat_vert_pos, cat_horz_pos)] = agent.act(nn_state)
-#     else:
-#         raise ValueError('Policy type not recognised. Should be None, dict or .pth filename')
-#
-#     for (state_cat_pos, action) in cat_pos_actions.items():
-#         if not state_cat_pos == mouse_pos:
-#             imscatter(state_cat_pos[1] + 1/2, state_cat_pos[0] + 1/2, plt.imread(action_to_arrow_files[action]), zoom = 0.1 * fig_width/10, ax=ax1)
-#
-#     plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
-#     plt.tick_params(axis='y', which='both', left=False, right=False, labelleft=False)
-#     plt.xlim(0,board_width)
-#     plt.ylim(0,board_height)
-#     plt.gca().invert_yaxis()
-#
-#     plt.show()
 
 
 def show_policy(mouse_pos, board_height, board_width, policy = None):
@@ -168,12 +102,20 @@ def show_policy(mouse_pos, board_height, board_width, policy = None):
         for cat_vert_pos in range(board_height):
             for cat_horz_pos in range(board_width):
                 cat_pos_actions[(cat_vert_pos, cat_horz_pos)] = np.random.choice(list(action_to_arrow_files.keys()))
-    elif type(policy) is dict:
+    elif type(policy) is str and policy[-4:] == '.txt':
+        metadata = extract_training_metadata(policy)
+        if not (int(metadata['board_height']) == board_height and int(metadata['board_width']) == board_width):
+            raise Exception('Policy was generated using different board size')
+        if policy.find('qlearning_policies/') == -1:
+            policy = 'qlearning_policies/' + policy
+            if policy.find('trained_parameters/') == -1:
+                policy = 'trained_parameters/' + policy
+        policy_dict = load_policy_from_file(policy)
         for cat_vert_pos in range(board_height):
             for cat_horz_pos in range(board_width):
                 cat_pos = (cat_vert_pos, cat_horz_pos)
                 state_index = positions_to_state_index(cat_pos, mouse_pos, board_height, board_width)
-                cat_pos_actions[cat_pos] = policy[state_index]
+                cat_pos_actions[cat_pos] = policy_dict[state_index]
 
         # for (state_index, action) in policy.items():
         #     state_cat_pos, state_mouse_pos = state_index_to_positions(state_index, board_height, board_width)
@@ -183,9 +125,11 @@ def show_policy(mouse_pos, board_height, board_width, policy = None):
         metadata = extract_training_metadata(policy)
         if not (int(metadata['board_height']) == board_height and int(metadata['board_width']) == board_width):
             raise Exception('Policy was generated using different board size')
-        agent = Agent(state_size = 2 + board_height * board_width, action_size = len(list(action_to_arrow_files.keys())), seed = 0)
-        if not policy[:16] == 'trained_weights/':
-            policy = 'trained_weights/' + policy
+        agent = Agent(state_size = 2 * board_height * board_width, action_size = len(list(action_to_arrow_files.keys())), seed = 0)
+        if policy.find('dqn_weights/') == -1:
+            policy = 'dqn_weights/' + policy
+            if policy.find('trained_parameters/') == -1:
+                policy = 'trained_parameters/' + policy
         agent.qnetwork_behaviour.load_state_dict(torch.load(policy))
         for cat_vert_pos in range(board_height):
             for cat_horz_pos in range(board_width):
@@ -207,7 +151,7 @@ def show_policy(mouse_pos, board_height, board_width, policy = None):
     plt.show()
 
 
-def plot_episode_stats(stats, smoothing_window=10, show_fig=True):
+def plot_episode_stats(stats, smoothing_window=100, show_fig=True):
     # generates plots showing various statistics related to training
     # including episode length, episode reward and episode number against time
     directory_name = 'training_analysis_' + datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -270,4 +214,3 @@ def plot_episode_stats(stats, smoothing_window=10, show_fig=True):
     # plt.savefig(join('graphics_training_analysis', 'training_analysis_' + datetime.now().strftime('%Y%m%d_%H%M') + '.png'))
 
     # return fig1, fig2, fig3, fig4
-    # return fig1
