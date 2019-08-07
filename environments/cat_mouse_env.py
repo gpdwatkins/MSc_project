@@ -73,7 +73,8 @@ class CatMouseEnv_binary_reward(discrete.DiscreteEnv):
                             new_state_instances[new_state][0] += 1
                 possible_next_states_list = []
                 for new_state, (no_instances, game_over) in new_state_instances.items():
-                    possible_next_state_tuple = (no_instances/(len(mouse_vert_moves) * len(mouse_horz_moves)), new_state, 1 * game_over, game_over)
+                    reward = 1 * game_over
+                    possible_next_state_tuple = (no_instances/(len(mouse_vert_moves) * len(mouse_horz_moves)), new_state, reward, game_over)
                     possible_next_states_list.append(possible_next_state_tuple)
                 P[state_index][action_to_action_index(action)] = possible_next_states_list
 
@@ -255,7 +256,7 @@ class CatMouseEnv_proximity_reward(discrete.DiscreteEnv):
                         reward = self.board_height * self.board_width
                     else:
                         cat_mouse_separation = max(abs(new_cat_vert_pos - new_mouse_vert_pos), abs(new_cat_horz_pos - new_mouse_horz_pos))
-                        reward = 0 - 2 * cat_mouse_separation
+                        reward = 0 - cat_mouse_separation
                     possible_next_state_tuple = (no_instances/(len(mouse_vert_moves) * len(mouse_horz_moves)), new_state, int(reward), game_over)
                     possible_next_states_list.append(possible_next_state_tuple)
                 P[state_index][action_to_action_index(action)] = possible_next_states_list

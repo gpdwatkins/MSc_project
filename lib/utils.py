@@ -197,20 +197,6 @@ def move_stays_on_board(pos, vert_move, horz_move, board_height, board_width):
     return ((pos[0] + vert_move) in range(board_height)) and ((pos[1] + horz_move) in range(board_width))
 
 
-def stabilisation_analysis(stats, averaging_window = 1000, mean_tolerance = 5, var_tolerance = 25):
-    i = 0
-    while i + 2 * averaging_window - 1 <= len(stats[0]):
-        average_window_1 = np.mean(stats.episode_lengths[i:i + averaging_window - 1])
-        # average_window_2 = np.mean(stats.episode_lengths[i + averaging_window:i + 2 * averaging_window - 1])
-        average_window_2 = np.mean(stats.episode_lengths[i + averaging_window:])
-        variance_whole_window = np.var(stats.episode_lengths[i:i + 2 * averaging_window - 1])
-        if ((abs(average_window_1 - average_window_2) < mean_tolerance) \
-        and variance_whole_window < var_tolerance):
-            return i, round(np.mean(stats.episode_lengths[i:]),2)
-        else:
-            i += averaging_window
-    raise Exception('Insufficient episodes for episode lengths to stabilise')
-
 def extract_training_metadata(filename):
     if filename[-4:] == '.pth':
         filename = filename[:-4]
@@ -332,3 +318,80 @@ def load_policy_from_file(filename):
             else:
                 pass # deal with bad lines of text here
     return policy
+
+
+
+
+# vvvvvvvvvvvvvv ANALYSIS vvvvvvvvvvvvvv
+
+def stabilisation_analysis(stats, averaging_window = 1000, mean_tolerance = 5, var_tolerance = 25):
+    i = 0
+    while i + 2 * averaging_window - 1 <= len(stats[0]):
+        average_window_1 = np.mean(stats.episode_lengths[i:i + averaging_window - 1])
+        # average_window_2 = np.mean(stats.episode_lengths[i + averaging_window:i + 2 * averaging_window - 1])
+        average_window_2 = np.mean(stats.episode_lengths[i + averaging_window:])
+        variance_whole_window = np.var(stats.episode_lengths[i:i + 2 * averaging_window - 1])
+        if ((abs(average_window_1 - average_window_2) < mean_tolerance) \
+        and variance_whole_window < var_tolerance):
+            return i, round(np.mean(stats.episode_lengths[i:]),2)
+        else:
+            i += averaging_window
+    raise Exception('Insufficient episodes for episode lengths to stabilise')
+
+
+def test_policy(env, board_height, board_width, no_episodes, policy = None, seed = None):
+    # note that if either cat or mouse attempts to move into the wall (even diagonally) they stay where they are
+
+    if not seed is None:
+        np.random.seed(seed)
+
+    if policy == None:
+        policy_type = 'random'
+    elif type(policy) is str and policy[-4:] == '.txt':
+        policy_type = 'state-action_dict'
+        metadata = extract_training_metadata(policy)
+        if not (int(metadata['board_height']) == board_height and int(metadata['board_width']) == board_width):
+            raise Exception('Policy was generated using different board size')
+        policy_dict = load_policy_from_file(policy)
+    elif type(policy) is str and policy[-4:] == '.pth':
+        policy_type = 'nn_weights'
+        metadata = extract_training_metadata(policy)
+        if not (int(metadata['board_height']) == board_height and int(metadata['board_width']) == board_width):
+            raise Exception('Policy was generated using different board size')
+        agent = Agent(state_size = 2 * board_height * board_width, action_size = 9, seed = 0)
+        agent.qnetwork_behaviour.load_state_dict(torch.load(policy))
+    else:
+        raise ValueError('Policy type not recognised. Should be None, dict or .pth filename')
+
+    stats = namedtuple("Stats",["episode_lengths", "episode_rewards"])(
+        episode_lengths=np.zeros(no_episodes),
+        episode_rewards=np.zeros(no_episodes))
+
+    for episode in range(1, no_episodes+1):
+
+        current_state_index = env.reset()
+
+        for timestep in itertools.count():
+            if policy_type == 'random':
+                action_index = np.random.randint(9)
+            elif policy_type == 'state-action_dict':
+                action_index = policy_dict[current_state_index]
+            elif policy_type == 'nn_weights':
+                cat_pos, mouse_pos = state_index_to_positions(current_state_index, board_height, board_width)
+                nn_state = positions_to_nn_input(cat_pos, mouse_pos, board_height, board_width)
+                action_index = agent.act(nn_state)
+            else:
+                raise ValueError('Never should have reached this point!')
+
+            # Take a step
+            next_state, reward, done, _ = env.step(action_index)
+
+            # Update statistics
+            stats.episode_rewards[episode-1] += reward
+            if done:
+                stats.episode_lengths[episode-1] = timestep
+                break
+
+            current_state_index = next_state
+
+    return np.average(stats.episode_lengths), np.average(stats.episode_rewards)

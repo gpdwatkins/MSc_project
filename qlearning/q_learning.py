@@ -133,6 +133,7 @@ def q_learning(env, no_episodes, discount_factor=0.9, alpha=0.5, epsilon=0.1, si
         # eps = max(eps_end, eps_decay*eps)
     return Q, stats
 
+
 def train_q_learning(env, no_episodes, discount_factor=0.5, alpha=0.5, epsilon=0.1, sight = float('inf')):
     start_time = datetime.now().strftime('%Y%m%d_%H%M')
 

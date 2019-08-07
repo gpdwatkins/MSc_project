@@ -23,7 +23,6 @@ env = CatMouseEnv_proximity_reward(board_height, board_width)
 
 # vvvvvvvvv q_learning training vvvvvvvvv
 policy_filename, stats_q = train_q_learning(env, no_episodes = 100000, discount_factor=0.5, alpha=0.2, epsilon=0.2, sight = float('inf'))
-
 policy_q = policy_filename
 
 
@@ -35,13 +34,14 @@ policy_dqn = weights_filename
 
 # vvvvvvvvv implementation vvvvvvvvv
 show_policy((3,5), board_height, board_width, policy = policy_q)
-
-
 show_policy((3,5), board_height, board_width, policy = policy_dqn)
 
-play_cat_and_mouse(board_height, board_width, show_figs = True, policy = policy_q, sight = 2, use_belief_state = False)
+test_policy(env, board_height, board_width, 10000, policy = policy_q, seed = None)
+test_policy(env, board_height, board_width, 10000, policy = policy_dqn, seed = None)
 
+play_cat_and_mouse(board_height, board_width, show_figs = True, policy = policy_q, sight = 2, use_belief_state = True)
 play_cat_and_mouse(board_height, board_width, show_figs = True, policy = policy_dqn, sight = 2, use_belief_state = True)
+play_cat_and_mouse(board_height, board_width, show_figs = True, policy = None, sight = 2, use_belief_state = True, seed=1)
 
 # vvvvvvvvv analysis vvvvvvvvv
 plot_episode_stats(stats_q)

@@ -24,13 +24,14 @@ import torch
 # and also with perfect information, probability dist of mouse pos and no prob dist
 # or should they be separate functions?
 
-def play_cat_and_mouse(board_height, board_width, show_figs = True, policy = None, sight = float('inf'), use_belief_state = False):
+def play_cat_and_mouse(board_height, board_width, show_figs = True, policy = None, sight = float('inf'), use_belief_state = False, seed = None):
     # assumimg cat has sight 2 in each direction (i.e. can see a 5x5 grid around iteself)
     # cat and mouse move uniformly (can move any direction, or stay put, with prob 1/9)
     # cat policy doesn't update - stays uniform
     # note that if either cat or mouse attempts to move into the wall (even diagonally) they stay where they are
 
-    np.random.seed(5)
+    if not seed is None:
+        np.random.seed(seed)
 
     start_time = datetime.now().strftime('%Y%m%d_%H%M')
     gif_filename = 'graphics_gif/the_gif/output_' + start_time + '.gif'
@@ -65,9 +66,9 @@ def play_cat_and_mouse(board_height, board_width, show_figs = True, policy = Non
     cat_pos, mouse_pos = initialise_cat_mouse_positions(board_height, board_width)
     # use this line if I want to specify where the cat and mouse start
     # cat_pos, mouse_pos = (3,4), (3,5)
-    board = np.array(np.zeros([board_height, board_width]), dtype='O')
-    board[cat_pos] = 'C'
-    board[mouse_pos] = 'M'
+    # board = np.array(np.zeros([board_height, board_width]), dtype='O')
+    # board[cat_pos] = 'C'
+    # board[mouse_pos] = 'M'
     mouse_pos_prob_dist = initialise_mouse_prob_dist(board_height, board_width, cat_pos, mouse_pos, sight)
 
     print('Starting position')
@@ -92,17 +93,23 @@ def play_cat_and_mouse(board_height, board_width, show_figs = True, policy = Non
         else:
             raise ValueError('Never should have reached this point!')
 
+        cat_move_stays_on_board = move_stays_on_board(cat_pos, cat_vert_move, cat_horz_move, board_height, board_width)
+        cat_pos = (cat_pos[0] + cat_vert_move * cat_move_stays_on_board, cat_pos[1] + cat_horz_move * cat_move_stays_on_board)
+
         mouse_vert_move = np.random.choice((-1,0,1))
         mouse_horz_move = np.random.choice((-1,0,1))
-        new_cat_pos = (cat_pos[0] + cat_vert_move, cat_pos[1] + cat_horz_move)
-        if (new_cat_pos[0] in range(board_height) and new_cat_pos[1] in range(board_width)):
-            cat_pos = new_cat_pos
-        new_mouse_pos = (mouse_pos[0] + mouse_vert_move, mouse_pos[1] + mouse_horz_move)
-        if (new_mouse_pos[0] in range(board_height) and new_mouse_pos[1] in range(board_width)):
-            mouse_pos = new_mouse_pos
-        board = np.array(np.zeros([board_height, board_width]), dtype='O')
-        board[cat_pos] = 'C'
-        board[mouse_pos] = 'M'
+        mouse_move_stays_on_board = move_stays_on_board(mouse_pos, mouse_vert_move, mouse_horz_move, board_height, board_width)
+        mouse_pos = (mouse_pos[0] + mouse_vert_move * mouse_move_stays_on_board, mouse_pos[1] + mouse_horz_move * mouse_move_stays_on_board)
+
+        # new_cat_pos = (cat_pos[0] + cat_vert_move, cat_pos[1] + cat_horz_move)
+        # if (new_cat_pos[0] in range(board_height) and new_cat_pos[1] in range(board_width)):
+        #     cat_pos = new_cat_pos
+        # new_mouse_pos = (mouse_pos[0] + mouse_vert_move, mouse_pos[1] + mouse_horz_move)
+        # if (new_mouse_pos[0] in range(board_height) and new_mouse_pos[1] in range(board_width)):
+        #     mouse_pos = new_mouse_pos
+        # board = np.array(np.zeros([board_height, board_width]), dtype='O')
+        # board[cat_pos] = 'C'
+        # board[mouse_pos] = 'M'
 
         if sight == float('inf'):
             # cat has perfect information of mouse position
