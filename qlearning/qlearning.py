@@ -5,6 +5,7 @@ import sys
 from collections import namedtuple
 from datetime import datetime
 from lib.utils import *
+from os import mkdir
 
 def initialise_q(nS, nA):
     # initialises a dict (keyed on state_index) of dicts (keyed on action_index).
@@ -62,7 +63,7 @@ def get_state_epsilon_greedy_policy(Q, epsilon, nA):
 
 
 # def q_learning(env, no_episodes, discount_factor=0.9, alpha=0.5, eps_start=1.0, eps_end=0.001, eps_decay=None, sight = float('inf')):
-def q_learning(env, no_episodes, discount_factor=0.9, alpha=0.5, epsilon=0.1, sight = float('inf')):
+def q_learning(env, no_episodes, discount_factor=0.5, alpha=0.001, epsilon=0.1, sight = float('inf')):
     """
     Q-Learning algorithm: Off-policy TD control. Finds the optimal greedy policy
     (target policy) while following an epsilon-greedy policy (behaviour policy)
@@ -82,6 +83,7 @@ def q_learning(env, no_episodes, discount_factor=0.9, alpha=0.5, epsilon=0.1, si
         stats is an EpisodeStats object with two numpy arrays for
         episode_lengths and episode_rewards
     """
+    # print('no_episodes',no_episodes, 'discount_factor', discount_factor, 'alpha', alpha, 'epsilon', epsilon, 'sight', sight)
 
     # The final action-value function.
     # A nested dictionary that maps state -> (action -> action-value).
@@ -134,19 +136,20 @@ def q_learning(env, no_episodes, discount_factor=0.9, alpha=0.5, epsilon=0.1, si
     return Q, stats
 
 
-def train_q_learning(env, no_episodes, discount_factor=0.5, alpha=0.5, epsilon=0.1, sight = float('inf')):
+def train_q_learning(env, no_episodes, discount_factor=0.5, alpha=0.001, epsilon=0.1, sight = float('inf'), save_policy = True, save_stats = True):
     start_time = datetime.now().strftime('%Y%m%d_%H%M')
 
-    Q_values, stats = q_learning(env, no_episodes, discount_factor, alpha, epsilon, sight)
+    Q_values, stats = q_learning(env, no_episodes, discount_factor = discount_factor, alpha = alpha, epsilon = epsilon, sight = sight)
     policy = get_greedy_policy(Q_values)
 
-    filename = 'trained_parameters/qlearning_policies/' + '_'.join([start_time, str(env.board_height), str(env.board_width), env.reward_type, str(no_episodes), str(discount_factor), str(alpha), str(epsilon), str(sight)]) + '.txt'
+    if save_policy:
+        weights_filename = 'trained_parameters/qlearning_policies/' + '_'.join([start_time, str(env.board_height), str(env.board_width), env.reward_type, str(no_episodes), str(discount_factor), str(alpha), str(epsilon), str(sight)]) + '.txt'
+        save_policy_to_file(policy, weights_filename)
 
-    save_policy_to_file(policy, filename)
-    # with open(filename, 'w') as working_file:
-    #     for key, value in policy.items():
-    #         working_file.write('%s:%s\n' % (key, value))
-    #     working_file.close()
+    if save_stats:
+        stats_directory = 'training_analysis/qlearning/' + '_'.join([start_time, str(env.board_height), str(env.board_width), env.reward_type, str(no_episodes), str(discount_factor), str(alpha), str(epsilon), str(sight)])
+        mkdir(stats_directory)
+        stats_filename = stats_directory + '/stats.txt'
+        save_training_analysis_to_file(stats, stats_filename)
 
-    # return policy, stats
-    return filename, stats
+    return weights_filename, stats_directory

@@ -4,18 +4,17 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from os.path import join
-from os import mkdir
 from imageio import get_writer, imread
 from lib.utils import *
 from datetime import datetime
 from deepqlearning.dqn_agent import Agent
 import torch
 
-# this file contains various functions to produce graphics
+# This file contains various functions to produce graphics
 
 def imscatter(x, y, image, ax=None, zoom=1):
-    # used for a scatter plot on 2d axes
-    # where the points are user-defined images
+    # Used to generate a scatter plot on 2d axes where the points are user-defined images
+
     if ax is None:
         ax = plt.gca()
     try:
@@ -33,9 +32,11 @@ def imscatter(x, y, image, ax=None, zoom=1):
 
 
 def generate_fig(cat_pos, mouse_pos, mouse_pos_prob_dist, board_height, board_width, filename, show_fig = True):
-    # generates and saves an image of the current board configuration
-    # we can specify whether we want the figure to be shown or saved silently
-    # these images are knitted together to form the gif
+    # Generates and saves an image of the current board configuration
+    # We can specify whether we want the figure to be shown or saved silently
+    # These images are knitted together to form the gif
+    # This function is only called by the play_cat_and_mouse function
+
     fig_width = 20
     fig = plt.figure(figsize=(fig_width, 0.8 * fig_width * board_height/board_width))
     ax1 = fig.add_subplot(111)
@@ -59,8 +60,9 @@ def generate_fig(cat_pos, mouse_pos, mouse_pos_prob_dist, board_height, board_wi
 
 
 def generate_gif(image_filenames, gif_filename):
-    # knits together the images (whose filenames are given as inputs)
+    # Knits together the images (whose filenames are given as inputs)
     # to create a gif showing a full episode of cat-and-mouse
+
     with get_writer(gif_filename, mode='I', duration=0.5, loop=1) as writer:
         for filename in image_filenames:
             image = imread(join('graphics_gif/', filename))
@@ -68,11 +70,13 @@ def generate_gif(image_filenames, gif_filename):
 
 
 def show_policy(mouse_pos, board_height, board_width, policy = None):
-    # given a policy and a mouse_pos, shows what action the cat would take
+    # Given a policy and a mouse_pos, shows what action the cat would take
     # if it were located in each of the other squares on the board
-    # if no policy is specified, a random policy is shown
-    # policy could alternatively be a dict mapping state_index to action
-    # or a string specifying a file path to some trained weights
+    # A policy can be provided as a string representing a filename -
+    # either a .txt file (which means it was trained using q learning)
+    # or a .pth file (which means it was trained using a deep neural network)
+    # If no policy is specified, a random policy is shown
+
     action_to_arrow_files = { \
     0:'images/icon_NW.gif', \
     1:'images/icon_N.gif', \
@@ -154,8 +158,8 @@ def show_policy(mouse_pos, board_height, board_width, policy = None):
 def plot_episode_stats(stats, smoothing_window=100, show_fig=True):
     # generates plots showing various statistics related to training
     # including episode length, episode reward and episode number against time
-    directory_name = 'training_analysis_' + datetime.now().strftime('%Y%m%d_%H%M%S')
-    mkdir(join('graphics_training_analysis', directory_name))
+    # directory_name = 'training_analysis_' + datetime.now().strftime('%Y%m%d_%H%M%S')
+    # mkdir(join('graphics_training_analysis', directory_name))
 
     # ax1 = fig1.add_subplot(111)
     # Plot the episode length over time
@@ -164,7 +168,7 @@ def plot_episode_stats(stats, smoothing_window=100, show_fig=True):
     plt.xlabel("Episode")
     plt.ylabel("Episode Length")
     plt.title("Episode Length over Time")
-    plt.savefig(join('graphics_training_analysis', directory_name, 'episode_lengths'))
+    # plt.savefig(join('graphics_training_analysis', directory_name, 'episode_lengths'))
     if show_fig:
         plt.show(fig1)
     else:
@@ -178,7 +182,7 @@ def plot_episode_stats(stats, smoothing_window=100, show_fig=True):
     plt.xlabel("Episode")
     plt.ylabel("Episode Length (Smoothed)")
     plt.title("Episode Length over Time (Smoothed over window size {})".format(smoothing_window))
-    plt.savefig(join('graphics_training_analysis', directory_name, 'episode_lengths_smoothed'))
+    # plt.savefig(join('graphics_training_analysis', directory_name, 'episode_lengths_smoothed'))
     if show_fig:
         plt.show(fig2)
     else:
@@ -192,7 +196,7 @@ def plot_episode_stats(stats, smoothing_window=100, show_fig=True):
     plt.xlabel("Episode")
     plt.ylabel("Episode Reward (Smoothed)")
     plt.title("Episode Reward over Time (Smoothed over window size {})".format(smoothing_window))
-    plt.savefig(join('graphics_training_analysis', directory_name, 'episode_rewards_smoothed'))
+    # plt.savefig(join('graphics_training_analysis', directory_name, 'episode_rewards_smoothed'))
     if show_fig:
         plt.show(fig3)
     else:
@@ -205,7 +209,7 @@ def plot_episode_stats(stats, smoothing_window=100, show_fig=True):
     plt.xlabel("Time Steps")
     plt.ylabel("Episode")
     plt.title("Episode per time step")
-    plt.savefig(join('graphics_training_analysis', directory_name, 'episodes_per_time_step'))
+    # plt.savefig(join('graphics_training_analysis', directory_name, 'episodes_per_time_step'))
     if show_fig:
         plt.show(fig4)
     else:
@@ -213,4 +217,43 @@ def plot_episode_stats(stats, smoothing_window=100, show_fig=True):
 
     # plt.savefig(join('graphics_training_analysis', 'training_analysis_' + datetime.now().strftime('%Y%m%d_%H%M') + '.png'))
 
-    # return fig1, fig2, fig3, fig4
+    return fig1, fig2, fig3, fig4
+
+
+def compare_training_graphics(list_of_filepaths, smoothing_window = 100):
+    # takes a list of stats filepaths as input and overlays them on the same axes
+
+    episode_lengths = {}
+    episode_rewards = {}
+
+    for filepath in list_of_filepaths:
+        metadata = extract_analysis_metadata(filepath)
+        stats = load_training_analysis_from_file(filepath)
+        episode_lengths[metadata['training_algorithm']] = stats.episode_lengths
+        episode_rewards[metadata['training_algorithm']] = stats.episode_rewards
+
+        # episode_lengths.append(stats.episode_lengths)
+        # episode_rewards.append(stats.episode_rewards)
+
+    fig1 = plt.figure(figsize=(10,5))
+    # legend_labels1 = []
+    for episode_length_label, episode_length_data in episode_lengths.items():
+        episode_lengths_smoothed = pd.Series(episode_length_data).rolling(smoothing_window, min_periods=smoothing_window).mean()
+        # legend_labels1.append(episode_length_label)
+        plt.plot(episode_lengths_smoothed, label = episode_length_label)
+    plt.title("Episode Length over Time (Smoothed over window size {})".format(smoothing_window))
+    plt.xlabel("Episode")
+    plt.ylabel("Episode Length (Smoothed)")
+    plt.legend()
+
+
+    fig2 = plt.figure(figsize=(10,5))
+    # legend_labels2 = []
+    for episode_reward_label, episode_reward_data in episode_rewards.items():
+        episode_rewards_smoothed = pd.Series(episode_reward_data).rolling(smoothing_window, min_periods=smoothing_window).mean()
+        # legend_labels2.append(episode_length_label)
+        plt.plot(episode_rewards_smoothed, label = episode_reward_label)
+    plt.title("Episode Reward over Time (Smoothed over window size {})".format(smoothing_window))
+    plt.xlabel("Episode")
+    plt.ylabel("Episode Reward (Smoothed)")
+    plt.legend()

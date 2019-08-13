@@ -9,25 +9,16 @@ from deepqlearning.dqn_agent import Agent
 import torch
 # from importlib import reload
 
-# this file contains a function that generates a gif for a game of cat-and-mouse
-# a policy can be provided (in the form of a .pth file containing weights and biases)
-# if no policy is provided, the cat and mouse move randomly
-# note that the policy refers only to the cat - the mouse continues to move randomly
+# This file contains a function that generates a gif for a game of cat-and-mouse
+# A policy can be provided as a string representing a filename -
+# either a .txt file (which means it was trained using q learning)
+# or a .pth file (which means it was trained using a deep neural network)
+# If no policy is provided, the cat moves randomly
+# Note that the policy refers only to the cat - the mouse always moves randomly
 
 
-
-
-# want to make this function general
-# need to get it to accept a policy
-# (in the form of a dict keyed on state_index or a .pth file of network weights)
-# also want to it be able to play the game with different amounts of 'sight range'
-# and also with perfect information, probability dist of mouse pos and no prob dist
-# or should they be separate functions?
-
-def play_cat_and_mouse(board_height, board_width, show_figs = True, policy = None, sight = float('inf'), use_belief_state = False, seed = None):
-    # assumimg cat has sight 2 in each direction (i.e. can see a 5x5 grid around iteself)
-    # cat and mouse move uniformly (can move any direction, or stay put, with prob 1/9)
-    # cat policy doesn't update - stays uniform
+def play_cat_and_mouse(board_height, board_width, policy = None, sight = float('inf'), use_belief_state = False, seed = None, show_figs = True):
+    # mouse moves uniformly (can move any direction, or stay put, with prob 1/9)
     # note that if either cat or mouse attempts to move into the wall (even diagonally) they stay where they are
 
     if not seed is None:
@@ -36,6 +27,7 @@ def play_cat_and_mouse(board_height, board_width, show_figs = True, policy = Non
     start_time = datetime.now().strftime('%Y%m%d_%H%M')
     gif_filename = 'graphics_gif/the_gif/output_' + start_time + '.gif'
 
+
     if policy == None:
         policy_type = 'random'
     elif type(policy) is str and policy[-4:] == '.txt':
@@ -43,12 +35,20 @@ def play_cat_and_mouse(board_height, board_width, show_figs = True, policy = Non
         metadata = extract_training_metadata(policy)
         if not (int(metadata['board_height']) == board_height and int(metadata['board_width']) == board_width):
             raise Exception('Policy was generated using different board size')
+        if not float(metadata['sight']) == sight:
+            raise Exception('Policy was generated using different sight range')
+        if not use_belief_state and not float(sight) == float('inf'):
+            raise Exception('Policy was generated using belief state')
         policy_dict = load_policy_from_file(policy)
     elif type(policy) is str and policy[-4:] == '.pth':
         policy_type = 'nn_weights'
         metadata = extract_training_metadata(policy)
         if not (int(metadata['board_height']) == board_height and int(metadata['board_width']) == board_width):
             raise Exception('Policy was generated using different board size')
+        if not float(metadata['sight']) == sight:
+            raise Exception('Policy was generated using different sight range')
+        if not (metadata['use_belief_state'] == 'True') == use_belief_state:
+            raise Exception('Inconsistent value for belief state')
         agent = Agent(state_size = 2 * board_height * board_width, action_size = 9, seed = 0)
         agent.qnetwork_behaviour.load_state_dict(torch.load(policy))
     else:
@@ -66,9 +66,6 @@ def play_cat_and_mouse(board_height, board_width, show_figs = True, policy = Non
     cat_pos, mouse_pos = initialise_cat_mouse_positions(board_height, board_width)
     # use this line if I want to specify where the cat and mouse start
     # cat_pos, mouse_pos = (3,4), (3,5)
-    # board = np.array(np.zeros([board_height, board_width]), dtype='O')
-    # board[cat_pos] = 'C'
-    # board[mouse_pos] = 'M'
     mouse_pos_prob_dist = initialise_mouse_prob_dist(board_height, board_width, cat_pos, mouse_pos, sight)
 
     print('Starting position')
@@ -100,16 +97,6 @@ def play_cat_and_mouse(board_height, board_width, show_figs = True, policy = Non
         mouse_horz_move = np.random.choice((-1,0,1))
         mouse_move_stays_on_board = move_stays_on_board(mouse_pos, mouse_vert_move, mouse_horz_move, board_height, board_width)
         mouse_pos = (mouse_pos[0] + mouse_vert_move * mouse_move_stays_on_board, mouse_pos[1] + mouse_horz_move * mouse_move_stays_on_board)
-
-        # new_cat_pos = (cat_pos[0] + cat_vert_move, cat_pos[1] + cat_horz_move)
-        # if (new_cat_pos[0] in range(board_height) and new_cat_pos[1] in range(board_width)):
-        #     cat_pos = new_cat_pos
-        # new_mouse_pos = (mouse_pos[0] + mouse_vert_move, mouse_pos[1] + mouse_horz_move)
-        # if (new_mouse_pos[0] in range(board_height) and new_mouse_pos[1] in range(board_width)):
-        #     mouse_pos = new_mouse_pos
-        # board = np.array(np.zeros([board_height, board_width]), dtype='O')
-        # board[cat_pos] = 'C'
-        # board[mouse_pos] = 'M'
 
         if sight == float('inf'):
             # cat has perfect information of mouse position

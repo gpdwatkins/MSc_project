@@ -3,6 +3,7 @@ import numpy as np
 import itertools
 from collections import deque
 from datetime import datetime
+from os import mkdir
 from lib.utils import *
 # %matplotlib inline
 from deepqlearning.dqn_agent import Agent
@@ -74,8 +75,7 @@ from collections import namedtuple
 #         torch.save(agent.qnetwork_behaviour.state_dict(), filename)
 #     return filename, stats
 
-
-def train_dqn(env, no_episodes, max_t=1000, eps_start=1.0, eps_end=0.001, eps_decay=None, sight = 2, use_belief_state = True):
+def train_dqn(env, no_episodes, max_t=1000, eps_start=1.0, eps_end=0.001, eps_decay=None, sight = 2, use_belief_state = True, save_weights = True, save_stats = True):
     """Deep Q-Learning.
 
     Params
@@ -86,6 +86,8 @@ def train_dqn(env, no_episodes, max_t=1000, eps_start=1.0, eps_end=0.001, eps_de
         eps_end (float): minimum value of epsilon
         eps_decay (float): multiplicative factor (per episode) for decreasing epsilon
     """
+    # code adapted from https://github.com/udacity/deep-reinforcement-learning/blob/master/dqn/exercise/Deep_Q_Network.ipynb
+    # https://github.com/udacity/deep-reinforcement-learning/blob/master/dqn/exercise/Deep_Q_Network.ipynb
     env.seed(0)
     board_height = env.board_height
     board_width = env.board_width
@@ -100,7 +102,7 @@ def train_dqn(env, no_episodes, max_t=1000, eps_start=1.0, eps_end=0.001, eps_de
     start_time = datetime.now().strftime('%Y%m%d_%H%M')
 
     # filename = 'trained_weights/' + '_'.join([start_time, str(env.board_height), str(env.board_width), env.reward_type, str(no_episodes), str(max_t), str(eps_start), str(eps_end), str(eps_decay)]) + '.pth'
-    filename = 'trained_parameters/dqn_weights/' + '_'.join([start_time, str(env.board_height), str(env.board_width), env.reward_type, str(no_episodes), str(eps_start), str(eps_end), str(eps_decay), str(sight), str(use_belief_state)]) + '.pth'
+    weights_filename = 'trained_parameters/dqn_weights/' + '_'.join([start_time, str(env.board_height), str(env.board_width), env.reward_type, str(no_episodes), str(eps_start), str(eps_end), str(eps_decay), str(sight), str(use_belief_state)]) + '.pth'
 
     scores_window = deque(maxlen=100)  # last 100 scores
     eps = eps_start                    # initialize epsilon
@@ -147,5 +149,12 @@ def train_dqn(env, no_episodes, max_t=1000, eps_start=1.0, eps_end=0.001, eps_de
         #     torch.save(agent.qnetwork_behaviour.state_dict(), filename)
         #     stats = stats._replace(episode_rewards = stats.episode_rewards[:episode], episode_lengths = stats.episode_lengths[:episode])
         #     break
-        torch.save(agent.qnetwork_behaviour.state_dict(), filename)
-    return filename, stats
+        torch.save(agent.qnetwork_behaviour.state_dict(), weights_filename)
+
+    if save_stats:
+        stats_directory = 'training_analysis/dqn/' + '_'.join([start_time, str(env.board_height), str(env.board_width), env.reward_type, str(no_episodes), str(eps_start), str(eps_end), str(eps_decay), str(sight), str(use_belief_state)])
+        mkdir(stats_directory)
+        stats_filename = stats_directory + '/stats.txt'
+        save_training_analysis_to_file(stats, stats_filename)
+
+    return weights_filename, stats_directory

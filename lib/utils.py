@@ -1,5 +1,5 @@
 import numpy as np
-
+from collections import namedtuple
 
 def initialise_board(height=19, width=19, walls=False):
     if not walls:
@@ -236,6 +236,44 @@ def extract_training_metadata(filename):
         raise Exception('Unrecognised file type')
 
 
+def extract_analysis_metadata(filepath):
+    if filepath.find('/') == -1:
+        raise Exception('Filepath must include parent directory, not just filename')
+    start_index_of_parent_dir = filepath.find('training_analysis')
+    if not start_index_of_parent_dir == -1:
+        filepath = filepath[start_index_of_parent_dir + len('training_analysis/'):]
+    metadata_list_1 = filepath.split('/')
+    metadata_list_2 = metadata_list_1[1].split('_')
+    if metadata_list_1[0] == 'dqn':
+        metadata_dict = {}
+        metadata_dict['training_algorithm'] = 'dqn'
+        metadata_dict['board_height'] = metadata_list_2[2]
+        metadata_dict['board_width'] = metadata_list_2[3]
+        metadata_dict['reward_type'] = metadata_list_2[4]
+        metadata_dict['no_episodes'] = metadata_list_2[5]
+        # metadata_dict['max_t'] = metadata_list[6]
+        metadata_dict['eps_start'] = metadata_list_2[6]
+        metadata_dict['eps_end'] = metadata_list_2[7]
+        metadata_dict['eps_decay'] = metadata_list_2[8]
+        metadata_dict['sight'] = metadata_list_2[9]
+        metadata_dict['use_belief_state'] = metadata_list_2[10]
+        return metadata_dict
+    elif metadata_list_1[0] == 'qlearning':
+        metadata_dict = {}
+        metadata_dict['training_algorithm'] = 'qlearning'
+        metadata_dict['board_height'] = metadata_list_2[2]
+        metadata_dict['board_width'] = metadata_list_2[3]
+        metadata_dict['reward_type'] = metadata_list_2[4]
+        metadata_dict['no_episodes'] = metadata_list_2[5]
+        metadata_dict['discount_factor'] = metadata_list_2[6]
+        metadata_dict['alpha'] = metadata_list_2[7]
+        metadata_dict['epsilon'] = metadata_list_2[8]
+        metadata_dict['sight'] = metadata_list_2[9]
+        return metadata_dict
+    else:
+        raise Exception('Unrecognised filepath - remember to include the parent directory')
+
+
 def observed_state_as_nn_input(board_height, board_width, true_state_index, previous_observed_state_nn_input, sight = 2, use_belief_state = True):
     # anything that has the form of a nn_input will be a list of length (2 * board_height * board_width)
     # it contains the cat position as a one-hot encoding (as it is known by the cat)
@@ -320,78 +358,24 @@ def load_policy_from_file(filename):
     return policy
 
 
+def save_training_analysis_to_file(stats, filename):
+    with open(filename, 'w') as file:
+        file.write(','.join(stats.episode_lengths.astype(str)))
+        file.write('\n')
+        file.write(','.join(stats.episode_rewards.astype(str)))
+        file.close()
 
 
-# vvvvvvvvvvvvvv ANALYSIS vvvvvvvvvvvvvv
-
-def stabilisation_analysis(stats, averaging_window = 1000, mean_tolerance = 5, var_tolerance = 25):
-    i = 0
-    while i + 2 * averaging_window - 1 <= len(stats[0]):
-        average_window_1 = np.mean(stats.episode_lengths[i:i + averaging_window - 1])
-        # average_window_2 = np.mean(stats.episode_lengths[i + averaging_window:i + 2 * averaging_window - 1])
-        average_window_2 = np.mean(stats.episode_lengths[i + averaging_window:])
-        variance_whole_window = np.var(stats.episode_lengths[i:i + 2 * averaging_window - 1])
-        if ((abs(average_window_1 - average_window_2) < mean_tolerance) \
-        and variance_whole_window < var_tolerance):
-            return i, round(np.mean(stats.episode_lengths[i:]),2)
-        else:
-            i += averaging_window
-    raise Exception('Insufficient episodes for episode lengths to stabilise')
-
-
-def test_policy(env, board_height, board_width, no_episodes, policy = None, seed = None):
-    # note that if either cat or mouse attempts to move into the wall (even diagonally) they stay where they are
-
-    if not seed is None:
-        np.random.seed(seed)
-
-    if policy == None:
-        policy_type = 'random'
-    elif type(policy) is str and policy[-4:] == '.txt':
-        policy_type = 'state-action_dict'
-        metadata = extract_training_metadata(policy)
-        if not (int(metadata['board_height']) == board_height and int(metadata['board_width']) == board_width):
-            raise Exception('Policy was generated using different board size')
-        policy_dict = load_policy_from_file(policy)
-    elif type(policy) is str and policy[-4:] == '.pth':
-        policy_type = 'nn_weights'
-        metadata = extract_training_metadata(policy)
-        if not (int(metadata['board_height']) == board_height and int(metadata['board_width']) == board_width):
-            raise Exception('Policy was generated using different board size')
-        agent = Agent(state_size = 2 * board_height * board_width, action_size = 9, seed = 0)
-        agent.qnetwork_behaviour.load_state_dict(torch.load(policy))
-    else:
-        raise ValueError('Policy type not recognised. Should be None, dict or .pth filename')
-
+def load_training_analysis_from_file(filepath):
+    filename = 'stats.txt'
+    if not filepath[-9:] == filename:
+        filepath = filepath + '/' + filename
+    with open(filepath) as file:
+        lines = file.readlines()
+        episode_lengths = lines[0].split(',')
+        episode_rewards = lines[1].split(',')
+        file.close()
     stats = namedtuple("Stats",["episode_lengths", "episode_rewards"])(
-        episode_lengths=np.zeros(no_episodes),
-        episode_rewards=np.zeros(no_episodes))
-
-    for episode in range(1, no_episodes+1):
-
-        current_state_index = env.reset()
-
-        for timestep in itertools.count():
-            if policy_type == 'random':
-                action_index = np.random.randint(9)
-            elif policy_type == 'state-action_dict':
-                action_index = policy_dict[current_state_index]
-            elif policy_type == 'nn_weights':
-                cat_pos, mouse_pos = state_index_to_positions(current_state_index, board_height, board_width)
-                nn_state = positions_to_nn_input(cat_pos, mouse_pos, board_height, board_width)
-                action_index = agent.act(nn_state)
-            else:
-                raise ValueError('Never should have reached this point!')
-
-            # Take a step
-            next_state, reward, done, _ = env.step(action_index)
-
-            # Update statistics
-            stats.episode_rewards[episode-1] += reward
-            if done:
-                stats.episode_lengths[episode-1] = timestep
-                break
-
-            current_state_index = next_state
-
-    return np.average(stats.episode_lengths), np.average(stats.episode_rewards)
+        episode_lengths=[float(item) for item in episode_lengths],
+        episode_rewards=[float(item) for item in episode_rewards])
+    return stats
