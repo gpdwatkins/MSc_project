@@ -23,13 +23,12 @@ env = CatMouseEnv_proximity_reward(board_height, board_width)
 
 
 # vvvvvvvvv q_learning training vvvvvvvvv
-policy_filename, stats_directory_q = train_q_learning(env, no_episodes = 500000, discount_factor=0.5, alpha=0.01, epsilon=0.5, sight = float('inf'))
-
+policy_filename, stats_directory_q = train_q_learning(env, no_episodes = 500000, discount_factor=0.99, alpha=5e-4 , epsilon=0.1, sight = float('inf'))
 policy_q = policy_filename
 
 
 # vvvvvvvvv q_learning training vvvvvvvvv
-weights_filename, stats_directory_dqn = train_dqn(env, no_episodes = 50000, sight = float('inf'), use_belief_state = False)
+weights_filename, stats_directory_dqn = train_dqn(env, no_episodes = 500000, sight = float('inf'), use_belief_state = False)
 policy_dqn = weights_filename
 # policy = '20190729_1926_4_6_prox_10000_1000_1.0_0.01_0.9995.pth'
 

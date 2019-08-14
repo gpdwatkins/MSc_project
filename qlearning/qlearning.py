@@ -49,6 +49,8 @@ def get_state_epsilon_greedy_policy(Q, epsilon, nA):
     def generate_policy(state_index):
         max_q_value = max(Q[state_index].values())
         best_actions = [action for action in Q[state_index].keys() if Q[state_index][action] == max_q_value]
+        # if count % 1000 == 0:
+        #     print(Q[1].values())
         best_action = rand.choice(best_actions)
         # best_action_index = np.argmax(list(Q[state_index].values()))
         policy = {}
@@ -63,7 +65,7 @@ def get_state_epsilon_greedy_policy(Q, epsilon, nA):
 
 
 # def q_learning(env, no_episodes, discount_factor=0.9, alpha=0.5, eps_start=1.0, eps_end=0.001, eps_decay=None, sight = float('inf')):
-def q_learning(env, no_episodes, discount_factor=0.5, alpha=0.001, epsilon=0.1, sight = float('inf')):
+def q_learning(env, no_episodes, discount_factor=0.9, alpha=0.5, epsilon=0.1, sight = float('inf')):
     """
     Q-Learning algorithm: Off-policy TD control. Finds the optimal greedy policy
     (target policy) while following an epsilon-greedy policy (behaviour policy)
@@ -113,6 +115,8 @@ def q_learning(env, no_episodes, discount_factor=0.5, alpha=0.001, epsilon=0.1, 
         for timestep in itertools.count():
             # Take a step
             action_probs = behaviour_policy(current_state)
+            # if episode <= 20:
+            #     print(behaviour_policy(1))
             action = np.random.choice(range(len(action_probs)), p=list(action_probs.values()))
             next_state, reward, done, _ = env.step(action)
 
@@ -124,6 +128,7 @@ def q_learning(env, no_episodes, discount_factor=0.5, alpha=0.001, epsilon=0.1, 
             best_next_actions = [action for action in Q[next_state].keys() if Q[next_state][action] == max_q_value]
             best_next_action = rand.choice(best_next_actions)
             td_target = reward + discount_factor * Q[next_state][best_next_action]
+            # td_target = reward + discount_factor * max_q_value
             td_delta = td_target - Q[current_state][action]
             Q[current_state][action] += alpha * td_delta
 
@@ -151,5 +156,6 @@ def train_q_learning(env, no_episodes, discount_factor=0.5, alpha=0.001, epsilon
         mkdir(stats_directory)
         stats_filename = stats_directory + '/stats.txt'
         save_training_analysis_to_file(stats, stats_filename)
-
-    return weights_filename, stats_directory
+    #
+    # return weights_filename, stats_directory
+    return 1,2
