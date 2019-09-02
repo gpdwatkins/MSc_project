@@ -15,10 +15,10 @@ UPDATE_EVERY = 4        # how often to update the network
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-class Agent():
+class DQNAgent():
     """Interacts with and learns from the environment."""
 
-    def __init__(self, state_size, action_size, seed):
+    def __init__(self, state_size, action_size, seed = None):
         """Initialize an Agent object.
 
         Params
@@ -29,17 +29,20 @@ class Agent():
         """
         self.state_size = state_size
         self.action_size = action_size
-        self.seed = random.seed(seed)
+        if not seed is None:
+            random.seed(seed)
 
         # Q-Network
-        self.qnetwork_behaviour = QNetwork(state_size, action_size, seed).to(device)
-        self.qnetwork_target = QNetwork(state_size, action_size, seed).to(device)
+        self.qnetwork_behaviour = QNetwork(state_size, action_size, seed = seed).to(device)
+        self.qnetwork_target = QNetwork(state_size, action_size, seed = seed).to(device)
         self.optimizer = optim.Adam(self.qnetwork_behaviour.parameters(), lr=LR)
 
         # Replay memory
-        self.memory = ReplayBuffer(action_size, BUFFER_SIZE, BATCH_SIZE, seed)
+        self.memory = ReplayBuffer(action_size, BUFFER_SIZE, BATCH_SIZE, seed = seed)
         # Initialize time step (for updating every UPDATE_EVERY steps)
         self.t_step = 0
+
+        self.flag = 0
 
     def step(self, state, action, reward, next_state, done):
         # Save experience in replay memory
@@ -61,14 +64,15 @@ class Agent():
             state (array_like): current state
             eps (float): epsilon, for epsilon-greedy action selection
         """
-        state = torch.from_numpy(state).float().unsqueeze(0).to(device)
-        self.qnetwork_behaviour.eval()
-        with torch.no_grad():
-            action_values = self.qnetwork_behaviour(state)
-        self.qnetwork_behaviour.train()
+
 
         # Epsilon-greedy action selection
         if random.random() > eps:
+            state = torch.from_numpy(state).float().unsqueeze(0).to(device)
+            self.qnetwork_behaviour.eval()
+            with torch.no_grad():
+                action_values = self.qnetwork_behaviour(state)
+            self.qnetwork_behaviour.train()
             return np.argmax(action_values.cpu().data.numpy())
         else:
             return random.choice(np.arange(self.action_size))
@@ -84,6 +88,7 @@ class Agent():
 
         # Get max predicted Q values (for next states) from target model
         Q_targets_next = self.qnetwork_target(next_states).detach().max(1)[0].unsqueeze(1)
+
         # Compute Q targets for current states
         Q_targets = rewards + (gamma * Q_targets_next * (1 - dones))
 
@@ -116,7 +121,7 @@ class Agent():
 class ReplayBuffer:
     """Fixed-size buffer to store experience tuples."""
 
-    def __init__(self, action_size, buffer_size, batch_size, seed):
+    def __init__(self, action_size, buffer_size, batch_size, seed = None):
         """Initialize a ReplayBuffer object.
         Params
         ======
@@ -129,7 +134,8 @@ class ReplayBuffer:
         self.memory = deque(maxlen=buffer_size)
         self.batch_size = batch_size
         self.experience = namedtuple("Experience", field_names=["state", "action", "reward", "next_state", "done"])
-        self.seed = random.seed(seed)
+        if not seed is None:
+            self.seed = random.seed(seed)
 
     def add(self, state, action, reward, next_state, done):
         """Add a new experience to memory."""

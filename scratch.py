@@ -1,7 +1,17 @@
 import numpy as np
 from collections import namedtuple
 
+from deepqlearning.dqn import train_dqn
+from drqn.drqn import train_drqn
+from qlearning.qlearning import *
+from lib.utils import *
+from lib.generate_graphics import *
+from lib.generate_gif import play_cat_and_mouse
+from lib.analysis import *
+from environments.cat_mouse_env import CatMouseEnv_binary_reward, CatMouseEnv_proximity_reward
+
 # import matplotlib.pyplot as plt
+
 # import pandas as pd
 # import seaborn as sns
 # import copy
@@ -408,3 +418,267 @@ def test_policy(env, board_height, board_width, no_episodes, policy = None, seed
 
 
     return np.average(stats.episode_lengths), np.average(stats.episode_rewards)
+
+
+
+def show_q_values(cat_pos, board_height, board_width, policy = None):
+    # Given a policy and a mouse_pos, shows what action the cat would take
+    # if it were located in each of the other squares on the board
+    # A policy can be provided as a string representing a filename -
+    # either a .txt file (which means it was trained using q learning)
+    # or a .pth file (which means it was trained using a deep neural network)
+    # If no policy is specified, a random policy is shown
+
+    # action_to_arrow_files = { \
+    # 0:'images/icon_NW.gif', \
+    # 1:'images/icon_N.gif', \
+    # 2:'images/icon_NE.gif', \
+    # 3:'images/icon_W.gif', \
+    # 4:'images/icon_X.gif', \
+    # 5:'images/icon_E.gif', \
+    # 6:'images/icon_SW.gif', \
+    # 7:'images/icon_S.gif', \
+    # 8:'images/icon_SE.gif', \
+    # }
+
+    fig_width = 20
+    fig = plt.figure(figsize=(fig_width, fig_width * board_height/board_width))
+    ax1 = fig.add_subplot(111)
+
+    mouse_pos_prob_dist = np.zeros([board_height, board_width])
+
+    sns.heatmap(mouse_pos_prob_dist, cmap="Blues", vmin=0, vmax=1, linewidths=.5, ax = ax1, cbar = None)
+    ax1.figure.axes[-1].yaxis.label.set_size(12)
+
+    imscatter(mouse_pos[1] + 1/2, mouse_pos[0] + 1/2, plt.imread('images/jerry.gif'), zoom = 0.1 * fig_width/10 * 6/board_width, ax=ax1)
+
+    # cat_pos_actions = {}
+    # if policy == None:
+    #     print("No policy provided; using random policy")
+    #     for cat_vert_pos in range(board_height):
+    #         for cat_horz_pos in range(board_width):
+    #             cat_pos_actions[(cat_vert_pos, cat_horz_pos)] = np.random.choice(list(action_to_arrow_files.keys()))
+    # elif type(policy) is str and policy[-4:] == '.txt':
+    #     metadata = extract_training_metadata(policy)
+    #     if not (int(metadata['board_height']) == board_height and int(metadata['board_width']) == board_width):
+    #         raise Exception('Policy was generated using different board size')
+    #     if policy.find('qlearning_policies/') == -1:
+    #         policy = 'qlearning_policies/' + policy
+    #         if policy.find('trained_parameters/') == -1:
+    #             policy = 'trained_parameters/' + policy
+    #     policy_dict = load_policy_from_file(policy)
+    #     for cat_vert_pos in range(board_height):
+    #         for cat_horz_pos in range(board_width):
+    #             cat_pos = (cat_vert_pos, cat_horz_pos)
+    #             state_index = positions_to_state_index(cat_pos, mouse_pos, board_height, board_width)
+    #             cat_pos_actions[cat_pos] = policy_dict[state_index]
+    #
+    #     # for (state_index, action) in policy.items():
+    #     #     state_cat_pos, state_mouse_pos = state_index_to_positions(state_index, board_height, board_width)
+    #     #     if mouse_pos == state_mouse_pos:
+    #     #         cat_pos_actions[state_cat_pos] = action
+    # elif type(policy) is str and policy[-4:] == '.pth':
+    #     metadata = extract_training_metadata(policy)
+    #     print(metadata)
+    #     if not (int(metadata['board_height']) == board_height and int(metadata['board_width']) == board_width):
+    #         raise Exception('Policy was generated using different board size')
+    #     agent = Agent(state_size = 2 * board_height * board_width, action_size = len(list(action_to_arrow_files.keys())), seed = 0)
+    #     if policy.find('dqn_weights/') == -1:
+    #         policy = 'dqn_weights/' + policy
+    #         if policy.find('trained_parameters/') == -1:
+    #             policy = 'trained_parameters/' + policy
+    #     agent.qnetwork_behaviour.load_state_dict(torch.load(policy))
+    #     for cat_vert_pos in range(board_height):
+    #         for cat_horz_pos in range(board_width):
+    #             nn_state = positions_to_nn_input((cat_vert_pos, cat_horz_pos), mouse_pos, board_height, board_width)
+    #             cat_pos_actions[(cat_vert_pos, cat_horz_pos)] = agent.act(nn_state)
+    # else:
+    #     raise ValueError('Policy type not recognised. Should be None, dict or .pth filename')
+
+
+
+
+    for (state_cat_pos, action) in cat_pos_actions.items():
+        if not state_cat_pos == mouse_pos:
+            imscatter(state_cat_pos[1] + 1/2, state_cat_pos[0] + 1/2, plt.imread(action_to_arrow_files[action]), zoom = 0.1 * fig_width/10, ax=ax1)
+
+    plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+    plt.tick_params(axis='y', which='both', left=False, right=False, labelleft=False)
+    plt.xlim(0,board_width)
+    plt.ylim(0,board_height)
+    plt.gca().invert_yaxis()
+
+    plt.show()
+
+
+scratch_list = [1,2,3,5,6,7]
+scratch_value = ",".join([str(elt) for elt in scratch_list])
+scratch_value
+
+policy = {1:[.1,.2,.3,.4,.5,.6,.7,.8,.9]}
+policy[2] = [.4,.5,.3,.6,.2,.7,.1,.8,.9]
+
+policy
+
+with open('scratch.txt', 'w') as file:
+    for key, value in policy.items():
+        value = ",".join([str(elt) for elt in value])
+        file.write('%s:%s\n' % (key, value))
+    file.close()
+
+
+from importlib import reload
+
+import lib.utils
+reload(lib.utils)
+from lib.utils import *
+
+
+load_qvalues_from_file('scratch.txt')
+max_stats_datapoints = 10000
+no_episodes = 10000
+save_stats_every = int(no_episodes / max_stats_datapoints) + 1 * (no_episodes % max_stats_datapoints != 0)
+
+save_stats_every
+
+
+from lib.generate_graphics import *
+from importlib import reload
+
+import lib.generate_graphics
+reload(lib.generate_graphics)
+from lib.generate_graphics import *
+
+import lib.utils
+reload(lib.utils)
+from lib.utils import *
+
+walls = [(0,2.5), (3,2.5), (1.5,0), (1.5,2), (1.5, 3), (1.5,5)]
+
+generate_fig((0,4), (1,1), np.ones((4,6)) * 0.25, 4, 6, 'scratch.png', show_fig = True, walls = [(0,2.5), (3,2.5), (1.5,0), (1.5,2), (1.5,3), (1.5,5)])
+
+# move_is_legal(pos, vert_move, horz_move, board_height, board_width, walls = None)
+move_is_legal((2,2), 1, 1, 4, 6)
+
+scratch_cat_can_see_mouse((0,1), (2,5),  walls = [(0,2.5), (3,2.5), (1.5,0), (1.5,2), (1.5, 3), (1.5,5)])
+
+def scratch_cat_can_see_mouse(cat_pos, mouse_pos, walls = None):
+    line_of_sight_grad = (cat_pos[0] - mouse_pos[0]) / (cat_pos[1] - mouse_pos[1])
+    def line_of_sight_get_row(cat_pos, col):
+        return line_of_sight_grad * (col - cat_pos[1]) + cat_pos[0]
+    def line_of_sight_get_col(cat_pos, row):
+        return (1/line_of_sight_grad) * (row - cat_pos[0]) + cat_pos[1]
+
+    for row_index in range(min(cat_pos[0], mouse_pos[0]), max(cat_pos[0], mouse_pos[0])):
+        col_index = line_of_sight_get_col(cat_pos, row_index + 0.5)
+        # print(row_index + 0.5, col_index)
+        if (col_index + 0.5) % 1 == 0:
+            if (row_index + 0.5, col_index - 0.5) in walls or\
+            (row_index + 0.5, col_index + 0.5) in walls:
+                return False
+        else:
+            if (row_index + 0.5, round(col_index)) in walls:
+                return False
+
+    for col_index in range(min(cat_pos[1], mouse_pos[1]), max(cat_pos[1], mouse_pos[1])):
+        row_index = line_of_sight_get_row(cat_pos, col_index + 0.5)
+        # print(row_index, col_index + 0.5)
+        if (row_index - 0.5) % 1 == 0:
+            if (row_index - 0.5, col_index + 0.5) in walls or\
+            (row_index + 0.5, col_index + 0.5) in walls:
+                return False
+        else:
+            if (round(row_index), col_index + 0.5) in walls:
+                return False
+
+    print('cat can see mouse')
+
+
+
+
+
+
+cat_pos = (0,1)
+mouse_pos = (2,2)
+line_of_sight_grad = (cat_pos[0] - mouse_pos[0]) / (cat_pos[1] - mouse_pos[1])
+
+def line_of_sight_get_row(cat_pos, col):
+    return line_of_sight_grad * (col - cat_pos[1]) + cat_pos[0]
+
+line_of_sight_get_row(cat_pos,1.5)
+
+
+
+board_height = 4
+board_width = 6
+walls = [(0,2.5), (3,2.5), (1.5,0), (1.5,2), (1.5, 3), (1.5,5)]
+cat_pos = (1,2)
+mouse_pos = (0,0)
+
+generate_fig(cat_pos, mouse_pos, np.ones((4,6)) * 0.25, 4, 6, 'scratch.png', show_fig = True, walls = walls)
+
+
+
+
+
+
+
+board_height = 4
+board_width = 6
+walls = [(0,2.5), (3,2.5), (1.5,0), (1.5,2), (1.5, 3), (1.5,5)]
+# walls = [(0,2.5), (2,2.5), (3,2.5)]
+# env = CatMouseEnv_binary_reward(board_height, board_width)
+env = CatMouseEnv_proximity_reward(board_height, board_width, walls = None)
+
+weights_filename, stats_directory_drqn = train_drqn(env, no_episodes = 10000, eps_start=1, eps_end=0.001, sight = float('inf'), use_belief_state = True, save_stats = True)
+policy_drqn = weights_filename
+
+
+stats = load_training_analysis_from_file(stats_directory_drqn + '/stats.txt')
+plot_episode_stats(stats, smoothing_window = 100, show_fig = True)
+show_policy((3,5), board_height, board_width, parameter_filename = policy_drqn, walls = None)
+test_policy(env, board_height, board_width, 1000, parameter_filename = policy_drqn, seed = 0, walls = None)
+play_cat_and_mouse(board_height, board_width, show_figs = True, parameter_filename = policy_drqn, sight = float('inf'), use_belief_state = True, seed=None, walls = None)
+
+
+
+
+from importlib import reload
+#
+# import qlearning.qlearning
+# reload(qlearning.qlearning)
+# from qlearning.qlearning import *
+#
+import lib.utils
+reload(lib.utils)
+from lib.utils import *
+
+import qlearning.qlearning
+reload (qlearning.qlearning)
+from qlearning.qlearning import *
+
+import deepqlearning.dqn
+reload (deepqlearning.dqn)
+from deepqlearning.dqn import train_dqn
+
+import drqn.drqn
+reload (drqn.drqn)
+from drqn.drqn import train_drqn
+
+import lib.generate_graphics
+reload (lib.generate_graphics)
+from lib.generate_graphics import *
+
+import lib.analysis
+reload (lib.analysis)
+from lib.analysis import *
+
+import lib.generate_gif
+reload (lib.generate_gif)
+from lib.generate_gif import play_cat_and_mouse
+
+
+
+
+scratch = [1,2,3,4,5,6]
+[scratch[i]*(i<3) for i in range(len(scratch))]

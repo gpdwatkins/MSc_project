@@ -39,9 +39,10 @@ class CatMouseEnv_binary_reward(discrete.DiscreteEnv):
     metadata = {'render.modes': ['human', 'ansi']}
 
 
-    def __init__(self, board_height, board_width):
+    def __init__(self, board_height, board_width, walls = None):
         self.board_height = board_height
         self.board_width = board_width
+        self.walls = walls
         self.reward_type = 'bin'
 
         nS = self.board_height * self.board_width * self.board_height * self.board_width
@@ -54,7 +55,8 @@ class CatMouseEnv_binary_reward(discrete.DiscreteEnv):
             P[state_index] = {}
             for action in actions:
                 cat_vert_move, cat_horz_move = action_to_moves(action)
-                cat_move_stays_on_board = ((cat_vert_pos + cat_vert_move) in range(self.board_height)) and ((cat_horz_pos + cat_horz_move) in range(self.board_width))
+                cat_move_stays_on_board = move_is_legal((cat_vert_pos, cat_horz_pos), cat_vert_move, cat_horz_move, self.board_height, self.board_width, walls = walls)
+                # cat_move_stays_on_board = ((cat_vert_pos + cat_vert_move) in range(self.board_height)) and ((cat_horz_pos + cat_horz_move) in range(self.board_width))
                 new_cat_vert_pos = cat_vert_pos + cat_vert_move * cat_move_stays_on_board
                 new_cat_horz_pos = cat_horz_pos + cat_horz_move * cat_move_stays_on_board
                 new_state_instances = {}
@@ -62,7 +64,7 @@ class CatMouseEnv_binary_reward(discrete.DiscreteEnv):
                 for mouse_vert_move in mouse_vert_moves:
                     for mouse_horz_move in mouse_horz_moves:
                         # mouse_action = self._moves_to_action(mouse_vert_move, mouse_horz_move)
-                        mouse_move_stays_on_board = move_stays_on_board((mouse_vert_pos, mouse_horz_pos), mouse_vert_move, mouse_horz_move, self.board_height, self.board_width)
+                        mouse_move_stays_on_board = move_is_legal((mouse_vert_pos, mouse_horz_pos), mouse_vert_move, mouse_horz_move, self.board_height, self.board_width, walls = walls)
                         new_mouse_vert_pos = mouse_vert_pos + mouse_vert_move * mouse_move_stays_on_board
                         new_mouse_horz_pos = mouse_horz_pos + mouse_horz_move * mouse_move_stays_on_board
                         new_state = positions_to_state_index((new_cat_vert_pos, new_cat_horz_pos), (new_mouse_vert_pos, new_mouse_horz_pos), self.board_height, self.board_width)
@@ -218,9 +220,10 @@ class CatMouseEnv_proximity_reward(discrete.DiscreteEnv):
     metadata = {'render.modes': ['human', 'ansi']}
 
 
-    def __init__(self, board_height, board_width):
+    def __init__(self, board_height, board_width, walls = None):
         self.board_height = board_height
         self.board_width = board_width
+        self.walls = walls
         self.reward_type = 'prox'
 
         nS = self.board_height * self.board_width * self.board_height * self.board_width
@@ -233,7 +236,8 @@ class CatMouseEnv_proximity_reward(discrete.DiscreteEnv):
             P[state_index] = {}
             for action in actions:
                 cat_vert_move, cat_horz_move = action_to_moves(action)
-                cat_move_stays_on_board = ((cat_vert_pos + cat_vert_move) in range(self.board_height)) and ((cat_horz_pos + cat_horz_move) in range(self.board_width))
+                cat_move_stays_on_board = move_is_legal((cat_vert_pos, cat_horz_pos), cat_vert_move, cat_horz_move, self.board_height, self.board_width, walls = walls)
+                # ((cat_vert_pos + cat_vert_move) in range(self.board_height)) and ((cat_horz_pos + cat_horz_move) in range(self.board_width))
                 new_cat_vert_pos = cat_vert_pos + cat_vert_move * cat_move_stays_on_board
                 new_cat_horz_pos = cat_horz_pos + cat_horz_move * cat_move_stays_on_board
                 new_state_instances = {}
@@ -241,7 +245,7 @@ class CatMouseEnv_proximity_reward(discrete.DiscreteEnv):
                 for mouse_vert_move in mouse_vert_moves:
                     for mouse_horz_move in mouse_horz_moves:
                         # mouse_action = self._moves_to_action(mouse_vert_move, mouse_horz_move)
-                        mouse_move_stays_on_board = move_stays_on_board((mouse_vert_pos, mouse_horz_pos), mouse_vert_move, mouse_horz_move, self.board_height, self.board_width)
+                        mouse_move_stays_on_board = move_is_legal((mouse_vert_pos, mouse_horz_pos), mouse_vert_move, mouse_horz_move, self.board_height, self.board_width, walls = walls)
                         new_mouse_vert_pos = mouse_vert_pos + mouse_vert_move * mouse_move_stays_on_board
                         new_mouse_horz_pos = mouse_horz_pos + mouse_horz_move * mouse_move_stays_on_board
                         new_state = positions_to_state_index((new_cat_vert_pos, new_cat_horz_pos), (new_mouse_vert_pos, new_mouse_horz_pos), self.board_height, self.board_width)

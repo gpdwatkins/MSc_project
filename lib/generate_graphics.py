@@ -7,7 +7,9 @@ from os.path import join
 from imageio import get_writer, imread
 from lib.utils import *
 from datetime import datetime
-from deepqlearning.dqn_agent import Agent
+from qlearning.qlearning import *
+from deepqlearning.dqn_agent import DQNAgent
+from drqn.drqn_agent import DRQNAgent
 import torch
 
 # This file contains various functions to produce graphics
@@ -31,11 +33,17 @@ def imscatter(x, y, image, ax=None, zoom=1):
     ax.autoscale()
 
 
-def generate_fig(cat_pos, mouse_pos, mouse_pos_prob_dist, board_height, board_width, filename, show_fig = True):
+def generate_fig(cat_pos, mouse_pos, mouse_pos_prob_dist, board_height, board_width, filename, show_fig = True, walls = None):
     # Generates and saves an image of the current board configuration
     # We can specify whether we want the figure to be shown or saved silently
     # These images are knitted together to form the gif
     # This function is only called by the play_cat_and_mouse function
+    # We can also specify (interior) wall segments on our board using the keyword arg walls
+    # The walls argument should be a list of 'coordinates' specifying the wall midpoint
+    # It has the (row_midpoint, col_midpoint)
+    # So the wall segment between the square in row 1, col 3 and the square in row 2, col 3
+    # would be indicated using the argument (1.5, 3)
+    # We can interpret this as 'the wall segment between rows 1 and 2, across column 3'
 
     fig_width = 20
     fig = plt.figure(figsize=(fig_width, 0.8 * fig_width * board_height/board_width))
@@ -48,6 +56,21 @@ def generate_fig(cat_pos, mouse_pos, mouse_pos_prob_dist, board_height, board_wi
 
     imscatter(cat_pos[1] + 1/2, cat_pos[0] + 1/2, plt.imread('images/tom.gif'), zoom = 0.1 * fig_width/10 * 6/board_width, ax=ax1)
     imscatter(mouse_pos[1] + 1/2, mouse_pos[0] + 1/2, plt.imread('images/jerry.gif'), zoom = (2/3) * 0.1 * fig_width/10 * 6/board_width, ax=ax1)
+
+    ax1.plot([0, 0], [0, board_height], color='black', linewidth=3*(6/board_width)**(1/2))
+    ax1.plot([0, board_width], [0, 0], color='black', linewidth=3*(6/board_width)**(1/2))
+    ax1.plot([0, board_width], [board_height - .005, board_height - .005], color='black', linewidth=3*(6/board_width)**(1/2))
+    ax1.plot([board_width - .005, board_width - .005], [0, board_height], color='black', linewidth=3*(6/board_width)**(1/2))
+
+    if not walls == None:
+        for wall_midpoint in walls:
+            midpoint_x_coord, midpoint_y_coord = wall_midpoint_to_coords(wall_midpoint)
+            if midpoint_x_coord%1 == 0 and (midpoint_y_coord - 0.5)%1 == 0:
+                ax1.plot([midpoint_x_coord, midpoint_x_coord], [midpoint_y_coord - 0.5, midpoint_y_coord + 0.5], color='black', linewidth=3*(6/board_width)**(1/2))
+            elif (midpoint_x_coord - 0.5)%1 == 0 and midpoint_y_coord%1 == 0:
+                ax1.plot([midpoint_x_coord - 0.5, midpoint_x_coord + 0.5], [midpoint_y_coord, midpoint_y_coord], color='black', linewidth=3*(6/board_width)**(1/2))
+            else:
+                raise Exception('Wall segments should be specified using their midpoint')
 
     plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
     plt.tick_params(axis='y', which='both', left=False, right=False, labelleft=False)
@@ -69,13 +92,13 @@ def generate_gif(image_filenames, gif_filename):
             writer.append_data(image)
 
 
-def show_policy(mouse_pos, board_height, board_width, policy = None):
-    # Given a policy and a mouse_pos, shows what action the cat would take
+def show_policy(mouse_pos, board_height, board_width, parameter_filename = None, walls = None):
+    # Given a parameter_filename and a mouse_pos, shows what action the cat would take
     # if it were located in each of the other squares on the board
-    # A policy can be provided as a string representing a filename -
+    # parameter_filename is a string representing a filename -
     # either a .txt file (which means it was trained using q learning)
     # or a .pth file (which means it was trained using a deep neural network)
-    # If no policy is specified, a random policy is shown
+    # If no parameter_filename is specified, a random policy is shown
 
     action_to_arrow_files = { \
     0:'images/icon_NW.gif', \
@@ -100,21 +123,38 @@ def show_policy(mouse_pos, board_height, board_width, policy = None):
 
     imscatter(mouse_pos[1] + 1/2, mouse_pos[0] + 1/2, plt.imread('images/jerry.gif'), zoom = 0.1 * fig_width/10 * 6/board_width, ax=ax1)
 
+    ax1.plot([0, 0], [0, board_height], color='black', linewidth=3*(6/board_width)**(1/2))
+    ax1.plot([0, board_width], [0, 0], color='black', linewidth=3*(6/board_width)**(1/2))
+    ax1.plot([0, board_width], [board_height - .005, board_height - .005], color='black', linewidth=3*(6/board_width)**(1/2))
+    ax1.plot([board_width - .005, board_width - .005], [0, board_height], color='black', linewidth=3*(6/board_width)**(1/2))
+
+    if not walls == None:
+        for wall_midpoint in walls:
+            midpoint_x_coord, midpoint_y_coord = wall_midpoint_to_coords(wall_midpoint)
+            if midpoint_x_coord%1 == 0 and (midpoint_y_coord - 0.5)%1 == 0:
+                ax1.plot([midpoint_x_coord, midpoint_x_coord], [midpoint_y_coord - 0.5, midpoint_y_coord + 0.5], color='black', linewidth=3*(6/board_width)**(1/2))
+            elif (midpoint_x_coord - 0.5)%1 == 0 and midpoint_y_coord%1 == 0:
+                ax1.plot([midpoint_x_coord - 0.5, midpoint_x_coord + 0.5], [midpoint_y_coord, midpoint_y_coord], color='black', linewidth=3*(6/board_width)**(1/2))
+            else:
+                raise Exception('Wall segments should be specified using their midpoint')
+
+
     cat_pos_actions = {}
-    if policy == None:
-        print("No policy provided; using random policy")
+    if parameter_filename == None:
+        print("No parameter_filename provided; using random policy")
         for cat_vert_pos in range(board_height):
             for cat_horz_pos in range(board_width):
                 cat_pos_actions[(cat_vert_pos, cat_horz_pos)] = np.random.choice(list(action_to_arrow_files.keys()))
-    elif type(policy) is str and policy[-4:] == '.txt':
-        metadata = extract_training_metadata(policy)
+    elif type(parameter_filename) is str and parameter_filename[-4:] == '.txt':
+        metadata = extract_training_metadata(parameter_filename)
         if not (int(metadata['board_height']) == board_height and int(metadata['board_width']) == board_width):
-            raise Exception('Policy was generated using different board size')
-        if policy.find('qlearning_policies/') == -1:
-            policy = 'qlearning_policies/' + policy
-            if policy.find('trained_parameters/') == -1:
-                policy = 'trained_parameters/' + policy
-        policy_dict = load_policy_from_file(policy)
+            raise Exception('Parameters were generated using different board size')
+        if parameter_filename.find('qlearning_qvalues/') == -1:
+            parameter_filename = 'qlearning_qvalues/' + parameter_filename
+            if parameter_filename.find('trained_parameters/') == -1:
+                parameter_filename = 'trained_parameters/' + parameter_filename
+        qvalues_dict = load_qvalues_from_file(parameter_filename)
+        policy_dict = get_greedy_policy(qvalues_dict)
         for cat_vert_pos in range(board_height):
             for cat_horz_pos in range(board_width):
                 cat_pos = (cat_vert_pos, cat_horz_pos)
@@ -125,22 +165,35 @@ def show_policy(mouse_pos, board_height, board_width, policy = None):
         #     state_cat_pos, state_mouse_pos = state_index_to_positions(state_index, board_height, board_width)
         #     if mouse_pos == state_mouse_pos:
         #         cat_pos_actions[state_cat_pos] = action
-    elif type(policy) is str and policy[-4:] == '.pth':
-        metadata = extract_training_metadata(policy)
+    elif type(parameter_filename) is str and parameter_filename[-4:] == '.pth':
+        metadata = extract_training_metadata(parameter_filename)
         if not (int(metadata['board_height']) == board_height and int(metadata['board_width']) == board_width):
-            raise Exception('Policy was generated using different board size')
-        agent = Agent(state_size = 2 * board_height * board_width, action_size = len(list(action_to_arrow_files.keys())), seed = 0)
-        if policy.find('dqn_weights/') == -1:
-            policy = 'dqn_weights/' + policy
-            if policy.find('trained_parameters/') == -1:
-                policy = 'trained_parameters/' + policy
-        agent.qnetwork_behaviour.load_state_dict(torch.load(policy))
-        for cat_vert_pos in range(board_height):
-            for cat_horz_pos in range(board_width):
-                nn_state = positions_to_nn_input((cat_vert_pos, cat_horz_pos), mouse_pos, board_height, board_width)
-                cat_pos_actions[(cat_vert_pos, cat_horz_pos)] = agent.act(nn_state)
+            raise Exception('Parameters were generated using different board size')
+        if metadata['algorithm'] == 'dqn' and parameter_filename.find('dqn_weights/') == -1:
+            parameter_filename = 'dqn_weights/' + parameter_filename
+        if metadata['algorithm'] == 'drqn' and parameter_filename.find('drqn_weights/') == -1:
+            parameter_filename = 'drqn_weights/' + parameter_filename
+        if parameter_filename.find('trained_parameters/') == -1:
+            parameter_filename = 'trained_parameters/' + parameter_filename
+        if metadata['algorithm'] == 'dqn':
+            agent = DQNAgent(state_size = 2 * board_height * board_width, action_size = len(list(action_to_arrow_files.keys())), seed = 0)
+            agent.qnetwork_behaviour.load_state_dict(torch.load(parameter_filename))
+            for cat_vert_pos in range(board_height):
+                for cat_horz_pos in range(board_width):
+                    nn_state = positions_to_nn_input((cat_vert_pos, cat_horz_pos), mouse_pos, board_height, board_width)
+                    cat_pos_actions[(cat_vert_pos, cat_horz_pos)] = agent.act(nn_state)
+        elif metadata['algorithm'] == 'drqn':
+            agent = DRQNAgent(state_size = 2 * board_height * board_width, action_size = len(list(action_to_arrow_files.keys())), seed = 0)
+            agent.drqn_behaviour.load_state_dict(torch.load(parameter_filename))
+            for cat_vert_pos in range(board_height):
+                for cat_horz_pos in range(board_width):
+                    nn_state = positions_to_nn_input((cat_vert_pos, cat_horz_pos), mouse_pos, board_height, board_width)
+                    drqn_state = nn_input_as_drqn_input(board_height, board_width, nn_state)
+                    hidden_state = agent.init_hidden()
+                    cat_pos_actions[(cat_vert_pos, cat_horz_pos)], hidden = agent.act(drqn_state, hidden_state)
+
     else:
-        raise ValueError('Policy type not recognised. Should be None, dict or .pth filename')
+        raise ValueError('parameter_filename type not recognised. Should be None, or .txt or .pth filename')
 
     for (state_cat_pos, action) in cat_pos_actions.items():
         if not state_cat_pos == mouse_pos:
@@ -164,7 +217,7 @@ def plot_episode_stats(stats, smoothing_window=100, show_fig=True):
     # ax1 = fig1.add_subplot(111)
     # Plot the episode length over time
     fig1 = plt.figure(figsize=(10,5))
-    plt.plot(stats.episode_lengths)
+    plt.plot(stats.saved_episodes, stats.episode_lengths)
     plt.xlabel("Episode")
     plt.ylabel("Episode Length")
     plt.title("Episode Length over Time")
@@ -178,7 +231,7 @@ def plot_episode_stats(stats, smoothing_window=100, show_fig=True):
     # Plot the (smoothed) episode length over time
     fig2 = plt.figure(figsize=(10,5))
     episode_lengths_smoothed = pd.Series(stats.episode_lengths).rolling(smoothing_window, min_periods=smoothing_window).mean()
-    plt.plot(episode_lengths_smoothed)
+    plt.plot(stats.saved_episodes, episode_lengths_smoothed)
     plt.xlabel("Episode")
     plt.ylabel("Episode Length (Smoothed)")
     plt.title("Episode Length over Time (Smoothed over window size {})".format(smoothing_window))
@@ -192,7 +245,7 @@ def plot_episode_stats(stats, smoothing_window=100, show_fig=True):
     # Plot the episode reward over time
     fig3 = plt.figure(figsize=(10,5))
     rewards_smoothed = pd.Series(stats.episode_rewards).rolling(smoothing_window, min_periods=smoothing_window).mean()
-    plt.plot(rewards_smoothed)
+    plt.plot(stats.saved_episodes, rewards_smoothed)
     plt.xlabel("Episode")
     plt.ylabel("Episode Reward (Smoothed)")
     plt.title("Episode Reward over Time (Smoothed over window size {})".format(smoothing_window))
@@ -226,12 +279,13 @@ def compare_training_graphics(list_of_filepaths, smoothing_window = 100):
     episode_lengths = {}
     episode_rewards = {}
 
+    i = 1
     for filepath in list_of_filepaths:
         metadata = extract_analysis_metadata(filepath)
         stats = load_training_analysis_from_file(filepath)
-        episode_lengths[metadata['training_algorithm']] = stats.episode_lengths
-        episode_rewards[metadata['training_algorithm']] = stats.episode_rewards
-
+        episode_lengths[metadata['training_algorithm'] + str(i)] = stats.episode_lengths
+        episode_rewards[metadata['training_algorithm'] + str(i)] = stats.episode_rewards
+        i+=1
         # episode_lengths.append(stats.episode_lengths)
         # episode_rewards.append(stats.episode_rewards)
 
