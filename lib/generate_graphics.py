@@ -92,13 +92,16 @@ def generate_gif(image_filenames, gif_filename):
             writer.append_data(image)
 
 
-def show_policy(mouse_pos, board_height, board_width, parameter_filename = None, walls = None):
+def show_policy(mouse_pos, board_height, board_width, parameter_filename = None, walls = None, sight = None):
     # Given a parameter_filename and a mouse_pos, shows what action the cat would take
     # if it were located in each of the other squares on the board
     # parameter_filename is a string representing a filename -
     # either a .txt file (which means it was trained using q learning)
     # or a .pth file (which means it was trained using a deep neural network)
     # If no parameter_filename is specified, a random policy is shown
+
+    # Note we can't use this function with a memory
+    # (unless we assume the cat/mouse positions are starting positions)
 
     action_to_arrow_files = { \
     0:'images/icon_NW.gif', \
@@ -158,7 +161,8 @@ def show_policy(mouse_pos, board_height, board_width, parameter_filename = None,
         for cat_vert_pos in range(board_height):
             for cat_horz_pos in range(board_width):
                 cat_pos = (cat_vert_pos, cat_horz_pos)
-                state_index = positions_to_state_index(cat_pos, mouse_pos, board_height, board_width)
+                current_true_state = positions_to_state_index(cat_pos, mouse_pos, board_height, board_width)
+                state_index = observed_state_as_qlearning_state(board_height, board_width, current_true_state, sight, walls)
                 cat_pos_actions[cat_pos] = policy_dict[state_index]
 
         # for (state_index, action) in policy.items():
@@ -180,7 +184,11 @@ def show_policy(mouse_pos, board_height, board_width, parameter_filename = None,
             agent.qnetwork_behaviour.load_state_dict(torch.load(parameter_filename))
             for cat_vert_pos in range(board_height):
                 for cat_horz_pos in range(board_width):
-                    nn_state = positions_to_nn_input((cat_vert_pos, cat_horz_pos), mouse_pos, board_height, board_width)
+                    if sight is None:
+                        nn_state = positions_to_nn_input((cat_vert_pos, cat_horz_pos), mouse_pos, board_height, board_width)
+                    else:
+                        current_true_state = positions_to_state_index((cat_vert_pos, cat_horz_pos), mouse_pos, board_height, board_width)
+                        nn_state = observed_state_as_nn_input(board_height, board_width, current_true_state, np.ones(2 * board_height * board_width), sight, use_belief_state = False, walls = walls)
                     cat_pos_actions[(cat_vert_pos, cat_horz_pos)] = agent.act(nn_state)
         elif metadata['algorithm'] == 'drqn':
             agent = DRQNAgent(state_size = 2 * board_height * board_width, action_size = len(list(action_to_arrow_files.keys())), seed = 0)
@@ -273,41 +281,120 @@ def plot_episode_stats(stats, smoothing_window=100, show_fig=True):
     return fig1, fig2, fig3, fig4
 
 
-def compare_training_graphics(list_of_filepaths, smoothing_window = 100):
+def compare_training_graphics(list_of_filepaths, list_of_labels, smoothing_window = 100):
     # takes a list of stats filepaths as input and overlays them on the same axes
 
     episode_lengths = {}
     episode_rewards = {}
 
-    i = 1
+    if not (len(list_of_filepaths) == len(list_of_labels)):
+        raise Exception('Wrong number of labels for number of datasets')
+
+    i = 0
     for filepath in list_of_filepaths:
         metadata = extract_analysis_metadata(filepath)
         stats = load_training_analysis_from_file(filepath)
-        episode_lengths[metadata['training_algorithm'] + str(i)] = stats.episode_lengths
-        episode_rewards[metadata['training_algorithm'] + str(i)] = stats.episode_rewards
+        episode_lengths[list_of_labels[i]] = stats.episode_lengths
+        episode_rewards[list_of_labels[i]] = stats.episode_rewards
         i+=1
         # episode_lengths.append(stats.episode_lengths)
         # episode_rewards.append(stats.episode_rewards)
 
-    fig1 = plt.figure(figsize=(10,5))
+    fig1 = plt.figure(figsize=(20,10))
     # legend_labels1 = []
     for episode_length_label, episode_length_data in episode_lengths.items():
-        episode_lengths_smoothed = pd.Series(episode_length_data).rolling(smoothing_window, min_periods=smoothing_window).mean()
         # legend_labels1.append(episode_length_label)
-        plt.plot(episode_lengths_smoothed, label = episode_length_label)
-    plt.title("Episode Length over Time (Smoothed over window size {})".format(smoothing_window))
-    plt.xlabel("Episode")
-    plt.ylabel("Episode Length (Smoothed)")
-    plt.legend()
+        if episode_length_label == 'Q-learning':
+            episode_lengths_smoothed = pd.Series(episode_length_data).rolling(int(smoothing_window/10), min_periods=int(smoothing_window/10)).mean()
+            x_coords = [i*100 for i in range(int(len(episode_lengths_smoothed)/10))]
+            y_coords = episode_lengths_smoothed[:int(len(episode_lengths_smoothed)/10)]
+            plt.plot(x_coords[:1000], y_coords[:1000], label = episode_length_label)
+            # plt.plot(x_coords, y_coords, label = episode_length_label)
+        else:
+            episode_lengths_smoothed = pd.Series(episode_length_data).rolling(smoothing_window, min_periods=smoothing_window).mean()
+            x_coords = [i*10 for i in range(len(episode_lengths_smoothed))]
+            plt.plot(x_coords[:10000], episode_lengths_smoothed[:10000], label = episode_length_label)
+            # plt.plot(x_coords, episode_lengths_smoothed, label = episode_length_label)
+    plt.title("Episode Lengths using sight 2 (Smoothed over window size {})".format(smoothing_window*10), fontsize = 32)
+    plt.xlabel("Episode", fontsize = 26)
+    plt.ylabel("Episode Length (Smoothed)", fontsize = 26)
+    plt.xticks(fontsize = 20)
+    plt.yticks(fontsize = 20)
+    plt.legend(fontsize = 26)
 
+    plt.savefig('report_graphics/1')
 
-    fig2 = plt.figure(figsize=(10,5))
+    fig2 = plt.figure(figsize=(20,10))
     # legend_labels2 = []
     for episode_reward_label, episode_reward_data in episode_rewards.items():
-        episode_rewards_smoothed = pd.Series(episode_reward_data).rolling(smoothing_window, min_periods=smoothing_window).mean()
+
         # legend_labels2.append(episode_length_label)
-        plt.plot(episode_rewards_smoothed, label = episode_reward_label)
-    plt.title("Episode Reward over Time (Smoothed over window size {})".format(smoothing_window))
-    plt.xlabel("Episode")
-    plt.ylabel("Episode Reward (Smoothed)")
-    plt.legend()
+        if episode_reward_label == 'Q-learning':
+            episode_rewards_smoothed = pd.Series(episode_reward_data).rolling(int(smoothing_window/10), min_periods=int(smoothing_window/10)).mean()
+            x_coords = [i*100 for i in range(int(len(episode_rewards_smoothed)/10))]
+            y_coords = episode_rewards_smoothed[:int(len(episode_rewards_smoothed)/10)]
+            plt.plot(x_coords[:1000], y_coords[:1000], label = episode_reward_label)
+            # plt.plot(x_coords, y_coords, label = episode_reward_label)
+        else:
+            episode_rewards_smoothed = pd.Series(episode_reward_data).rolling(smoothing_window, min_periods=smoothing_window).mean()
+            x_coords = [i*10 for i in range(len(episode_rewards_smoothed))]
+            plt.plot(x_coords[:10000], episode_rewards_smoothed[:10000], label = episode_reward_label)
+            # plt.plot(x_coords, episode_rewards_smoothed, label = episode_reward_label)
+
+
+        # x_coords = [i*10 for i in range(len(episode_rewards_smoothed))]
+        # plt.plot(x_coords, episode_rewards_smoothed, label = episode_reward_label)
+        # plt.plot(x_coords[:10000], episode_rewards_smoothed[:10000], label = episode_reward_label)
+    plt.title("Episode Rewards using sight ∞ (Smoothed over window size {})".format(smoothing_window*10), fontsize = 32)
+    plt.xlabel("Episode", fontsize = 26)
+    plt.ylabel("Episode Reward (Smoothed)", fontsize = 26)
+    plt.xticks(fontsize = 20)
+    plt.yticks(fontsize = 20)
+    plt.legend(fontsize = 26)
+
+    plt.savefig('report_graphics/2')
+    # return fig1, fig2
+
+def compare_test_performance(list_of_tuples, list_of_labels):
+
+    if not (len(list_of_tuples) == len(list_of_labels)):
+        raise Exception('Wrong number of labels for number of datasets')
+
+    data_labels = ['Average episode length', 'Average episode reward']
+    if len(list_of_tuples) == 3:
+        bar_colors = ['#051cb2', '#c7cef9', '#2642f7']
+    elif len(list_of_tuples) == 4:
+        bar_colors = ['#051cb2', '#c7cef9', '#2642f7', '#8490dc']
+    # data = {}
+
+    # for i in len(list_of_labels):
+        # data[list_of_labels[i]] = list_of_tuples[i]
+
+    # men_means = [20, 34, 30, 35, 27]
+    # women_means = [25, 32, 34, 20, 25]
+
+    x = np.arange(len(data_labels))  # the label locations
+
+    # fig1 = plt.figure(figsize=(20,10))
+    fig, ax = plt.subplots(figsize=(20,10))
+    no_bars = len(list_of_labels)
+    width = 0.8 * 1/no_bars  # the width of the bars
+    for i in range(no_bars):
+        ax.bar(x + (1/2 -no_bars/2 + i) * width, list_of_tuples[i], width, label = list_of_labels[i], color = bar_colors[i])
+
+#
+    # rects1 = ax.bar(x - width/2, men_means, width, label='Men')
+    # rects2 = ax.bar(x + width/2, women_means, width, label='Women')
+
+    # Add some text for labels, title and custom x-axis tick labels, etc.
+    ax.set_ylabel('Scores', fontsize = 26)
+    ax.set_title('Comparison of algorithms using sight 2 over 100000 episodes', fontsize = 32)
+    ax.set_xticks(x)
+    ax.set_xticklabels(data_labels, fontsize = 26)
+    ax.legend()
+    plt.xticks(fontsize = 26)
+    plt.yticks(fontsize = 20)
+    plt.legend(fontsize = 26)
+    plt.grid(b=True, axis='y')
+
+    plt.savefig('report_graphics/3')

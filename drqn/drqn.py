@@ -10,7 +10,7 @@ from drqn.drqn_agent import DRQNAgent
 from collections import namedtuple
 
 
-def drqn(env, weights_filename, no_episodes, eps_start=1.0, eps_end=0.001, eps_decay=None, sight = float('inf'), use_belief_state = True, save_weights = True, save_stats = True):
+def drqn(env, weights_filename, no_episodes, eps_start, eps_end, eps_decay, sight):
     """Deep Q-Learning.
 
     Params
@@ -51,7 +51,7 @@ def drqn(env, weights_filename, no_episodes, eps_start=1.0, eps_end=0.001, eps_d
         cat_pos, mouse_pos = state_index_to_positions(state_index, board_height, board_width)
 
         initial_state_distribution = np.ones(2 * board_height * board_width)
-        observed_state_nn_input = observed_state_as_nn_input(board_height, board_width, state_index, initial_state_distribution, sight = sight, use_belief_state = use_belief_state, walls = walls)
+        observed_state_nn_input = observed_state_as_nn_input(board_height, board_width, state_index, initial_state_distribution, sight = sight, walls = walls)
         observed_state_drqn_input = nn_input_as_drqn_input(board_height, board_width, observed_state_nn_input)
 
         hidden = drqn_agent.init_hidden()
@@ -64,7 +64,7 @@ def drqn(env, weights_filename, no_episodes, eps_start=1.0, eps_end=0.001, eps_d
             # if flag < 2:
             #     print(next_state_index)
             #     flag += 1
-            next_observed_state_nn_input = observed_state_as_nn_input(board_height, board_width, next_state_index, observed_state_nn_input, sight = sight, use_belief_state = use_belief_state, walls = walls)
+            next_observed_state_nn_input = observed_state_as_nn_input(board_height, board_width, next_state_index, observed_state_nn_input, sight = sight, walls = walls)
             next_observed_state_drqn_input = nn_input_as_drqn_input(board_height, board_width, next_observed_state_nn_input)
 
             drqn_agent.step(timestep == 0, observed_state_drqn_input, hidden, action, reward, next_observed_state_drqn_input, next_hidden, done)
@@ -89,7 +89,7 @@ def drqn(env, weights_filename, no_episodes, eps_start=1.0, eps_end=0.001, eps_d
         # scores.append(score)              # save most recent score
         eps = max(eps_end, eps_decay*eps) # decrease epsilon
         print('\rEpisode {}\tAverage Score: {:.2f}'.format(episode, np.mean(scores_window)), end="")
-        if episode % 100 == 0:
+        if episode % 10000 == 0:
             print('\rEpisode {}\tAverage Score: {:.2f}'.format(episode, np.mean(scores_window)))
 
     torch.save(drqn_agent.drqn_behaviour.state_dict(), weights_filename)
@@ -98,11 +98,11 @@ def drqn(env, weights_filename, no_episodes, eps_start=1.0, eps_end=0.001, eps_d
     return stats
 
 
-def train_drqn(env, no_episodes, eps_start=1.0, eps_end=0.001, eps_decay=None, sight = float('inf'), use_belief_state = True, save_weights = True, save_stats = True):
+def train_drqn(env, no_episodes, eps_start=1.0, eps_end=0.001, eps_decay=None, sight = float('inf'), use_belief_state = False, save_weights = True, save_stats = True):
     start_time = datetime.now().strftime('%Y%m%d_%H%M')
     weights_filename = 'trained_parameters/drqn_weights/' + '_'.join([start_time, str(env.board_height), str(env.board_width), env.reward_type, str(no_episodes), str(eps_start), str(eps_end), str(eps_decay), str(sight), str(use_belief_state), 'drqn']) + '.pth'
 
-    stats = drqn(env, weights_filename, no_episodes, eps_start=1.0, eps_end=0.001, eps_decay=None, sight = float('inf'), use_belief_state = True)
+    stats = drqn(env, weights_filename, no_episodes, eps_start, eps_end, eps_decay, sight)
 
     if save_stats:
         stats_directory = 'training_analysis/drqn/' + '_'.join([start_time, str(env.board_height), str(env.board_width), env.reward_type, str(no_episodes), str(eps_start), str(eps_end), str(eps_decay), str(sight), str(use_belief_state)])

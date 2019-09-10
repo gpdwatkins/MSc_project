@@ -91,7 +91,10 @@ def q_learning(env, no_episodes, discount_factor, alpha, eps_start, eps_end, eps
 
     # The final action-value function.
     # A nested dictionary that maps state -> (action -> action-value).
-    Q = initialise_q(env.observation_space.n, env.action_space.n)
+    # if sight is None:
+    #     Q = initialise_q(env.observation_space.n, env.action_space.n)
+    # else:
+    Q = initialise_q(env.observation_space.n + env.board_height * env.board_width, env.action_space.n)
 
     if eps_decay == None:
         eps_decay = (eps_end/eps_start)**(1/no_episodes)
@@ -115,14 +118,17 @@ def q_learning(env, no_episodes, discount_factor, alpha, eps_start, eps_end, eps
 
     for episode in range(1, no_episodes+1):
         # Print out the number of completed episodes in increments of print_interval
-        print_interval = 100
+        print_interval = 10000
         if episode % print_interval == 0:
             print("Episode %i/%i" % (episode, no_episodes))
             sys.stdout.flush()
 
         # Reset the environment and pick the first action
-        true_current_state = env.reset()
-        current_state = 
+        current_true_state = env.reset()
+
+        current_state = observed_state_as_qlearning_state(env.board_height, env.board_width, current_true_state, sight, env.walls)
+
+
         # count += 1
         for timestep in itertools.count():
             # Take a step
@@ -131,7 +137,8 @@ def q_learning(env, no_episodes, discount_factor, alpha, eps_start, eps_end, eps
             # if episode <= 20:
             #     print(behaviour_policy(1))
             action = np.random.choice(range(len(action_probs)), p=list(action_probs.values()))
-            next_state, reward, done, _ = env.step(action)
+            next_true_state, reward, done, _ = env.step(action)
+            next_state = observed_state_as_qlearning_state(env.board_height, env.board_width, next_true_state, sight, env.walls)
 
             # if current_state == 552 and episode%10000 == 0:
             #     print('current_state:', current_state)

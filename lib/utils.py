@@ -240,7 +240,7 @@ def moves_to_action_index(vert_move, horz_move):
     return int((vert_move + 1 ) * 3 + (horz_move + 1))
 
 
-def move_is_legal(pos, vert_move, horz_move, board_height, board_width, walls = None):
+def move_is_legal(pos, vert_move, horz_move, board_height, board_width, walls):
     if not (((pos[0] + vert_move) in range(board_height)) and ((pos[1] + horz_move) in range(board_width))):
         # attempted move would go outside board
         return False
@@ -248,6 +248,7 @@ def move_is_legal(pos, vert_move, horz_move, board_height, board_width, walls = 
         if (vert_move != 0 and horz_move != 0):
             vertex_point = (pos[0] + 0.5 * vert_move, pos[1] + 0.5 * horz_move)
             for wall in walls:
+                # if wall[0] = vertex_point
                 if (abs(wall[0] - vertex_point[0]) <= 0.5 and abs(wall[1] - vertex_point[1]) <= 0.5):
                     return False
             return True
@@ -330,6 +331,20 @@ def extract_analysis_metadata(filepath):
         metadata_dict['sight'] = metadata_list_2[9]
         metadata_dict['use_belief_state'] = metadata_list_2[10]
         return metadata_dict
+    elif metadata_list_1[0] == 'drqn':
+        metadata_dict = {}
+        metadata_dict['training_algorithm'] = 'drqn'
+        metadata_dict['board_height'] = metadata_list_2[2]
+        metadata_dict['board_width'] = metadata_list_2[3]
+        metadata_dict['reward_type'] = metadata_list_2[4]
+        metadata_dict['no_episodes'] = metadata_list_2[5]
+        # metadata_dict['max_t'] = metadata_list[6]
+        metadata_dict['eps_start'] = metadata_list_2[6]
+        metadata_dict['eps_end'] = metadata_list_2[7]
+        metadata_dict['eps_decay'] = metadata_list_2[8]
+        metadata_dict['sight'] = metadata_list_2[9]
+        metadata_dict['use_belief_state'] = metadata_list_2[10]
+        return metadata_dict
     elif metadata_list_1[0] == 'qlearning':
         metadata_dict = {}
         metadata_dict['training_algorithm'] = 'qlearning'
@@ -352,15 +367,18 @@ def extract_analysis_metadata(filepath):
 
 
 def observed_state_as_qlearning_state(board_height, board_width, true_state_index, sight, walls):
-    cat_pos, mouse_pos = state_index_to_positions(state_index, board_height, board_width)
+    cat_pos, mouse_pos = state_index_to_positions(true_state_index, board_height, board_width)
     if cat_can_see_mouse(cat_pos, mouse_pos, sight, walls):
         return true_state_index
     else:
-        new_state_vector = [true_state_index[i] * (i<board_height*board_width) for i in range(len(true_state_index))]
-        new_state_vector = true_
+        return int( \
+        cat_pos[0] + \
+        cat_pos[1] * board_height  + \
+        board_width * board_height * board_width * board_height \
+        )
 
 
-def observed_state_as_nn_input(board_height, board_width, true_state_index, previous_observed_state_nn_input, sight, use_belief_state, walls):
+def observed_state_as_nn_input(board_height, board_width, true_state_index, previous_observed_state_nn_input, sight, use_belief_state = False, walls = None):
     # anything that has the form of a nn_input will be a list of length (2 * board_height * board_width)
     # it contains the cat position as a one-hot encoding (as it is known by the cat)
     # and a probability distribution for the mouse position

@@ -80,7 +80,7 @@ from collections import namedtuple
 
 #####!!!!! vvvvv EPSILON DECAYS vvvvv !!!!!#####
 
-def dqn(env, weights_filename, no_episodes, eps_start=1.0, eps_end=0.001, eps_decay=None, sight = float('inf'), use_belief_state = True, save_weights = True, save_stats = True):
+def dqn(env, weights_filename, no_episodes, eps_start, eps_end, eps_decay, sight, use_belief_state):
     """Deep Q-Learning.
 
     Params
@@ -164,7 +164,7 @@ def dqn(env, weights_filename, no_episodes, eps_start=1.0, eps_end=0.001, eps_de
         # scores.append(score)              # save most recent score
         eps = max(eps_end, eps_decay*eps) # decrease epsilon
         print('\rEpisode {}\tAverage Score: {:.2f}'.format(episode, np.mean(scores_window)), end="")
-        if episode % 100 == 0:
+        if episode % 10000 == 0:
             print('\rEpisode {}\tAverage Score: {:.2f}'.format(episode, np.mean(scores_window)))
         # if len(scores_window) == 100 and np.mean(scores_window) >= board_height * board_width - min(board_height, board_width):
         #     print('\nEnvironment solved in {:d} episodes!\tAverage Score: {:.2f}'.format(episode-100, np.mean(scores_window)))
@@ -199,7 +199,7 @@ def train_dqn(env, no_episodes, eps_start=1.0, eps_end=0.001, eps_decay=None, si
     start_time = datetime.now().strftime('%Y%m%d_%H%M')
     weights_filename = 'trained_parameters/dqn_weights/' + '_'.join([start_time, str(env.board_height), str(env.board_width), env.reward_type, str(no_episodes), str(eps_start), str(eps_end), str(eps_decay), str(sight), str(use_belief_state), 'dqn']) + '.pth'
 
-    stats = dqn(env, weights_filename, no_episodes, eps_start=1.0, eps_end=0.001, eps_decay=None, sight = float('inf'), use_belief_state = True)
+    stats = dqn(env, weights_filename, no_episodes, eps_start, eps_end, eps_decay, sight, use_belief_state)
 
     # if save_weights:
     #     # qvalues_filename = 'trained_parameters/qlearning_qvalues/' + '_'.join([start_time, str(env.board_height), str(env.board_width), env.reward_type, str(no_episodes), str(discount_factor), str(alpha), str(eps_start), str(eps_end), str(eps_decay), str(sight)]) + '.txt'

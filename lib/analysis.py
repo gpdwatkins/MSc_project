@@ -31,7 +31,7 @@ def training_graphical_analysis(stats_directory, smoothing_window=1, show_figs =
 
     # return directory_name
 
-def stabilisation_analysis(stats_directory, averaging_window = 100, mean_tolerance = 5, var_tolerance = 25):
+def stabilisation_analysis(stats_directory, averaging_window = 100, mean_tolerance = 5, var_tolerance = 25, mean_tolerances = None, var_tolerances = None):
     # Checks whether the mean and variance of episode lengths has stabilised
     # We consider the episode lengths to have stabilised at episode i if:
     # The difference between the mean over the next (averaging_window) episodes
@@ -41,25 +41,48 @@ def stabilisation_analysis(stats_directory, averaging_window = 100, mean_toleran
 
     stats = load_training_analysis_from_file(stats_directory)
 
-    i = 0
-    failed_on = ''
-    while i + 2 * averaging_window - 1 <= len(stats[0]):
-        average_window_1 = np.mean(stats.episode_lengths[i:i + averaging_window])
-        # average_window_2 = np.mean(stats.episode_lengths[i + averaging_window:i + 2 * averaging_window - 1])
-        average_window_2 = np.mean(stats.episode_lengths[i + averaging_window:])
-        if (abs(average_window_1 - average_window_2) < mean_tolerance):
-            variance_remaining_episodes = np.var(stats.episode_lengths[i:])
-            if variance_remaining_episodes < var_tolerance:
-                return int(stats.saved_episodes[i]), round(np.mean(stats.episode_lengths[i:]),2)
+    if ((not (mean_tolerances is None)) and (not (var_tolerances is None))):
+        raise Exception('Cannot give both a list of means and a list of variances as input')
+    elif ((mean_tolerances is None) and (var_tolerances is None)):
+
+        i = 0
+        failed_on = ''
+        while i + 2 * averaging_window - 1 <= len(stats[0]):
+            average_window_1 = np.mean(stats.episode_lengths[i:i + averaging_window])
+            # average_window_2 = np.mean(stats.episode_lengths[i + averaging_window:i + 2 * averaging_window - 1])
+            average_window_2 = np.mean(stats.episode_lengths[i + averaging_window:])
+            if (abs(average_window_1 - average_window_2) < mean_tolerance):
+                variance_remaining_episodes = np.var(stats.episode_lengths[i:])
+                if variance_remaining_episodes < var_tolerance:
+                    return int(stats.saved_episodes[i]), round(np.mean(stats.episode_lengths[i:]),2)
+                else:
+                    failed_on = 'variance'
             else:
-                failed_on = 'variance'
-        else:
-            failed_on = 'mean'
-        i += averaging_window
-    raise Exception('Insufficient episodes for %s of episode lengths to stabilise' % failed_on)
+                failed_on = 'mean'
+            i += averaging_window
+        raise Exception('Insufficient episodes for %s of episode lengths to stabilise' % failed_on)
 
 
-def test_policy(env, board_height, board_width, no_episodes, parameter_filename = None, seed = None):
+    elif (not (mean_tolerances is None)):
+        output = []
+        mean_tolerance_index = 0
+        i = 0
+        # failed_on = ''
+        while i + 2 * averaging_window - 1 <= len(stats[0]):
+            average_window_1 = np.mean(stats.episode_lengths[i:i + averaging_window])
+            # average_window_2 = np.mean(stats.episode_lengths[i + averaging_window:i + 2 * averaging_window - 1])
+            average_window_2 = np.mean(stats.episode_lengths[i + averaging_window:])
+            if (abs(average_window_1 - average_window_2) < mean_tolerances[mean_tolerance_index]):
+                output.append(int(stats.saved_episodes[i]))
+                mean_tolerance_index += 1
+                if mean_tolerance_index == len(mean_tolerances):
+                    return output
+            else:
+                i += averaging_window
+        raise Exception('Insufficient episodes for mean of episode lengths to stabilise with tolerance %i' % mean_tolerances[mean_tolerance_index])
+
+
+def test_policy(env, board_height, board_width, no_episodes, parameter_filename = None, seed = None, sight = None, use_belief_state = False):
     # note that if either cat or mouse attempts to move into the wall (even diagonally) they stay where they are
 
     if not seed is None:
@@ -109,19 +132,25 @@ def test_policy(env, board_height, board_width, no_episodes, parameter_filename 
     for episode in range(1, no_episodes+1):
 
         current_state_index = env.reset()
+        if (policy_type == 'dqn_weights' or policy_type == 'drqn_weights'):
+            nn_state = np.ones(2 * board_height * board_width)
 
         for timestep in itertools.count():
             if policy_type == 'random':
                 action_index = np.random.randint(9)
             elif policy_type == 'state-qvalues_dict':
+                current_true_state = current_state_index
+                current_state_index = observed_state_as_qlearning_state(env.board_height, env.board_width, current_true_state, sight, env.walls)
                 action_index = policy_dict[current_state_index]
             elif policy_type == 'dqn_weights':
                 cat_pos, mouse_pos = state_index_to_positions(current_state_index, board_height, board_width)
-                nn_state = positions_to_nn_input(cat_pos, mouse_pos, board_height, board_width)
+                # nn_state = positions_to_nn_input(cat_pos, mouse_pos, board_height, board_width)
+                nn_state = observed_state_as_nn_input(env.board_height, env.board_width, current_state_index, nn_state, sight, use_belief_state = use_belief_state, walls = env.walls)
                 action_index = agent.act(nn_state)
             elif policy_type == 'drqn_weights':
                 cat_pos, mouse_pos = state_index_to_positions(current_state_index, board_height, board_width)
-                nn_state = positions_to_nn_input(cat_pos, mouse_pos, board_height, board_width)
+                # nn_state = positions_to_nn_input(cat_pos, mouse_pos, board_height, board_width)
+                nn_state = observed_state_as_nn_input(env.board_height, env.board_width, current_state_index, nn_state, sight, walls= env.walls)
                 drqn_state = nn_input_as_drqn_input(board_height, board_width, nn_state)
                 if timestep == 0:
                     hidden = agent.init_hidden()

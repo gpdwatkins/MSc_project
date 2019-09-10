@@ -19,7 +19,6 @@ class DRQNNetwork(nn.Module):
 
         self.no_layers = no_layers
         self.hidden_dim = hidden_dim
-        self.no_layers = no_layers
 
         if not seed is None:
             self.seed = torch.manual_seed(seed)

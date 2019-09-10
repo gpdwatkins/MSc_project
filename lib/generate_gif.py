@@ -41,9 +41,6 @@ def play_cat_and_mouse(board_height, board_width, parameter_filename = None, sig
                 raise Exception('Policy was generated using different sight range')
         elif not float(metadata['sight']) == sight:
             raise Exception('Policy was generated using different sight range')
-        if (metadata['walls'] == 'None'):
-            if not walls == None:
-                raise Exception('Inconsistent value for walls')
         # if not use_belief_state and not float(sight) == float('inf'):
             # raise Exception('Policy was generated using belief state')
         if parameter_filename.find('qlearning_qvalues/') == -1:
@@ -67,9 +64,6 @@ def play_cat_and_mouse(board_height, board_width, parameter_filename = None, sig
             raise Exception('Policy was generated using different sight range')
         if not (metadata['use_belief_state'] == 'True') == use_belief_state:
             raise Exception('Inconsistent value for belief state')
-        if (metadata['walls'] == 'None'):
-            if not walls == None:
-                raise Exception('Inconsistent value for walls')
         if metadata['algorithm'] == 'dqn' and parameter_filename.find('dqn_weights/') == -1:
             parameter_filename = 'dqn_weights/' + parameter_filename
         if metadata['algorithm'] == 'drqn' and parameter_filename.find('drqn_weights/') == -1:
@@ -95,6 +89,8 @@ def play_cat_and_mouse(board_height, board_width, parameter_filename = None, sig
     # Initialise stuff
     initial_board = np.array(initialise_board(board_height, board_width))
     cat_pos, mouse_pos = initialise_cat_mouse_positions(board_height, board_width)
+    if (policy_type == 'dqn_weights' or policy_type == 'drqn_weights'):
+        nn_state = np.ones(2 * board_height * board_width)
     if policy_type == 'drqn_weights':
         hidden = agent.init_hidden()
     # use this line if I want to specify where the cat and mouse start
@@ -109,19 +105,23 @@ def play_cat_and_mouse(board_height, board_width, parameter_filename = None, sig
 
     iter = 1
     while cat_pos != mouse_pos:
+        current_true_state = positions_to_state_index(cat_pos, mouse_pos, board_height, board_width)
         if policy_type == 'random':
             cat_vert_move = np.random.choice((-1,0,1))
             cat_horz_move = np.random.choice((-1,0,1))
         elif policy_type == 'state-action_dict':
-            state_index = positions_to_state_index(cat_pos, mouse_pos, board_height, board_width)
+            # current_true_state = positions_to_state_index(cat_pos, mouse_pos, board_height, board_width)
+            state_index = observed_state_as_qlearning_state(board_height, board_width, current_true_state, sight, walls)
             cat_action_index = policy_dict[state_index]
             cat_vert_move, cat_horz_move = action_index_to_moves(cat_action_index)
         elif policy_type == 'dqn_weights':
-            nn_state = positions_to_nn_input(cat_pos, mouse_pos, board_height, board_width)
+            nn_state = observed_state_as_nn_input(board_height, board_width, current_true_state, nn_state, sight, use_belief_state = use_belief_state, walls = walls)
+            # nn_state = positions_to_nn_input(cat_pos, mouse_pos, board_height, board_width)
             action_index = agent.act(nn_state)
             cat_vert_move, cat_horz_move = action_index_to_moves(action_index)
         elif policy_type == 'drqn_weights':
-            nn_state = positions_to_nn_input(cat_pos, mouse_pos, board_height, board_width)
+            nn_state = observed_state_as_nn_input(board_height, board_width, current_true_state, nn_state, sight, use_belief_state = use_belief_state, walls = walls)
+            # nn_state = positions_to_nn_input(cat_pos, mouse_pos, board_height, board_width)
             drqn_state = nn_input_as_drqn_input(board_height, board_width, nn_state)
             action_index, hidden = agent.act(drqn_state, hidden)
             cat_vert_move, cat_horz_move = action_index_to_moves(action_index)
@@ -136,7 +136,7 @@ def play_cat_and_mouse(board_height, board_width, parameter_filename = None, sig
         mouse_move_stays_on_board = move_is_legal(mouse_pos, mouse_vert_move, mouse_horz_move, board_height, board_width, walls = walls)
         mouse_pos = (mouse_pos[0] + mouse_vert_move * mouse_move_stays_on_board, mouse_pos[1] + mouse_horz_move * mouse_move_stays_on_board)
 
-        if sight == None or cat_can_see_mouse(cat_pos, mouse_pos, sight, walls = walls):
+        if sight is None or cat_can_see_mouse(cat_pos, mouse_pos, sight, walls = walls):
             mouse_pos_prob_dist = np.zeros((board_height, board_width))
             mouse_pos_prob_dist[mouse_pos] = 1
         elif not use_belief_state:
